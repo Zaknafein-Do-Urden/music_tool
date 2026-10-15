@@ -36,6 +36,7 @@
         <button class="chip" id="suggest-toggle" type="button" aria-pressed="false">💡 推荐</button>
         <button class="chip" id="headphones" type="button" aria-pressed="false">🎧 耳机</button>
         <button class="chip" id="takes-open" type="button">录音 <span id="takes-count">0</span></button>
+        <button class="chip icon" id="settings-open" type="button" aria-label="设置">⚙</button>
       </div>
     </header>
 
@@ -71,6 +72,16 @@
       <button type="button" id="detect-start" class="primary">开始</button>
       <button type="button" id="detect-apply" class="primary" hidden>用这个调</button>
       <button type="button" id="detect-close">关闭</button>
+    </div>
+  </dialog>
+
+  <dialog class="sheet" id="settings-dialog">
+    <h2>设置</h2>
+    <h3>伴奏织体</h3>
+    <p class="hint" id="pattern-hint">点名字试听（伴奏中会立刻切换）。点 ★ 选为常用，最多 3 个，显示在主界面底部。</p>
+    <div class="plist" id="pattern-list"></div>
+    <div class="actions">
+      <button type="button" id="settings-close" class="primary">完成</button>
     </div>
   </dialog>
 

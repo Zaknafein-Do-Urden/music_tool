@@ -1,5 +1,6 @@
 import { MODES, makeKey, chordFor } from './theory.js';
 import { Engine, PATTERNS, METERS } from './engine.js';
+import { DEFAULT_FAVORITES } from './patterns.js';
 import { Mic } from './mic.js';
 import { midiName } from './pitch.js';
 import { segmentNotes, estimateKey, framesHistogram } from './analysis.js';
@@ -32,6 +33,11 @@ const state = {
   meter: METERS[saved.meter] ? saved.meter : '4/4',
   bpm: +(saved.bpm ?? 80),
   headphones: !!saved.headphones,
+  // 主界面底部显示的常用织体（1–3 个），完整列表在设置页
+  favorites: (() => {
+    const f = Array.isArray(saved.favorites) ? saved.favorites.filter((id) => PATTERNS[id]).slice(0, 3) : [];
+    return f.length ? f : [...DEFAULT_FAVORITES];
+  })(),
 };
 const currentKey = () => makeKey(state.key, state.mode);
 
@@ -139,8 +145,20 @@ renderBeats();
 // 定调结果也会改大小调，所以要能从外面刷新这组按钮
 const renderMode = segmented(els.mode, Object.entries(MODES).map(([id, m]) => [id, m.name]),
   () => state.mode, (m) => changeKey(state.key, m));
-segmented(els.pattern, Object.entries(PATTERNS).map(([id, p]) => [id, p.name]),
-  () => state.pattern, (p) => { state.pattern = p; engine.setPattern(p); });
+let renderPatternBar = () => {};
+function buildPatternBar() {
+  els.pattern.innerHTML = '';
+  renderPatternBar = segmented(els.pattern, state.favorites.map((id) => [id, PATTERNS[id].name]),
+    () => state.pattern, setPattern);
+}
+function setPattern(id) {
+  state.pattern = id;
+  engine.setPattern(id);
+  renderPatternBar();
+  renderPatternList();
+  saveSettings();
+}
+buildPatternBar();
 segmented(els.quantize, [['beat', '下一拍'], ['bar', '下一小节']],
   () => state.quantize, (q) => { state.quantize = q; engine.setQuantize(q); });
 
@@ -436,3 +454,56 @@ function addTake(raw) {
 
 $('takes-open').addEventListener('click', () => takesDialog.showModal());
 $('takes-close').addEventListener('click', () => takesDialog.close());
+
+// ---------- 设置页：全部织体，选 3 个常用 ----------
+const settingsDialog = $('settings-dialog');
+const patternList = $('pattern-list');
+const patternHint = $('pattern-hint');
+const PATTERN_HINT = patternHint.textContent;
+let hintTimer = null;
+
+function renderPatternList() {
+  patternList.innerHTML = '';
+  for (const [id, p] of Object.entries(PATTERNS)) {
+    const row = document.createElement('div');
+    row.className = 'prow' + (id === state.pattern ? ' current' : '');
+    const fav = state.favorites.includes(id);
+    row.innerHTML = `<button type="button" class="pick">${p.name}<small>${p.desc}</small></button>`
+      + `<button type="button" class="star" aria-pressed="${fav}" aria-label="${fav ? '取消常用' : '设为常用'}">★</button>`;
+    row.querySelector('.pick').addEventListener('click', () => setPattern(id));
+    row.querySelector('.star').addEventListener('click', () => toggleFavorite(id));
+    patternList.appendChild(row);
+  }
+}
+
+function warn(text) {
+  patternHint.textContent = text;
+  patternHint.classList.add('warn');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => {
+    patternHint.textContent = PATTERN_HINT;
+    patternHint.classList.remove('warn');
+  }, 2500);
+}
+
+function toggleFavorite(id) {
+  const favs = state.favorites;
+  if (favs.includes(id)) {
+    if (favs.length === 1) { warn('至少留一个常用织体'); return; }
+    state.favorites = favs.filter((f) => f !== id);
+  } else {
+    if (favs.length >= 3) { warn('最多 3 个常用，先点掉一个 ★'); return; }
+    // 按完整列表的顺序排，主界面按钮位置稳定
+    const order = Object.keys(PATTERNS);
+    state.favorites = [...favs, id].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  }
+  buildPatternBar();
+  renderPatternList();
+  saveSettings();
+}
+
+$('settings-open').addEventListener('click', () => {
+  renderPatternList();
+  settingsDialog.showModal();
+});
+$('settings-close').addEventListener('click', () => settingsDialog.close());

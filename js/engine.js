@@ -1,7 +1,7 @@
-// 伴奏引擎：Tone.js 钢琴采样 + 按八分音符步进的节奏型。
+// 伴奏引擎：Tone.js 钢琴采样 + 按十六分音符步进的织体（见 patterns.js）。
 // 点按钮不是"播一下"，而是排队一个和弦，在下一拍/下一小节切换；节奏由 Transport 保证。
 import { chordFor, voiceChord, bassNote } from './theory.js';
-import { METERS, PATTERNS } from './patterns.js';
+import { METERS, PATTERNS, compilePattern } from './patterns.js';
 
 export { METERS, PATTERNS };
 
@@ -26,8 +26,9 @@ export class Engine {
   constructor({ onStep, onLoaded }) {
     this.onStep = onStep;
     this.key = null;
-    this.pattern = PATTERNS.block;
+    this.patternId = 'block';
     this.meter = METERS['4/4'];
+    this.events = compilePattern(this.patternId, this.meter.name);
     this.bpm = 80;
     this.quantize = 'beat'; // 'beat' | 'bar'
     this.current = null; // 当前级数索引
@@ -44,8 +45,12 @@ export class Engine {
     }).toDestination();
     this.piano.volume.value = -3;
 
+    // 界面更新走 Tone.Draw（requestAnimationFrame）。默认晚于 0.25s 的更新会被丢弃，
+    // 手机一卡顿和弦高亮就不同步；每次更新都带完整状态，晚到也照样画
+    Tone.Draw.expiration = 2;
+
     Tone.Transport.bpm.value = 80;
-    Tone.Transport.scheduleRepeat((time) => this._tick(time), '8n');
+    Tone.Transport.scheduleRepeat((time) => this._tick(time), '16n');
   }
 
   setKey(key) {
@@ -57,9 +62,13 @@ export class Engine {
     this.bpm = bpm;
     Tone.Transport.bpm.rampTo(bpm * (this.meter.bpmScale ?? 1), 0.1);
   }
-  setPattern(id) { this.pattern = PATTERNS[id]; }
+  setPattern(id) {
+    this.patternId = id;
+    this.events = compilePattern(id, this.meter.name);
+  }
   setMeter(id) {
     this.meter = METERS[id];
+    this.events = compilePattern(this.patternId, id);
     this.step %= this.meter.steps;
     this.setBpm(this.bpm);
   }
@@ -98,8 +107,9 @@ export class Engine {
 
   get playing() { return Tone.Transport.state === 'started'; }
 
-  // 一小节多少秒（引擎每步是一个八分音符）
-  barSeconds() { return (this.meter.steps * 30) / Tone.Transport.bpm.value; }
+  // 一个十六分音符多少秒（Transport 的 bpm 是四分音符速度）
+  stepSeconds() { return 15 / Tone.Transport.bpm.value; }
+  barSeconds() { return this.meter.steps * this.stepSeconds(); }
 
   _voice(degree, prev) {
     const chord = chordFor(this.key, degree);
@@ -121,10 +131,10 @@ export class Engine {
 
     if (this.current !== null) {
       const chord = chordFor(this.key, this.current);
-      const ev = this.pattern.meters[this.meter.name][step];
-      // 换和弦那一刻若节奏型这一步没有低音，补一个低音+整和弦，让切换清晰可闻
-      if (changed && !(ev && (ev.bass || ev.bassFifth))) {
-        this._play(chord, { bass: true, notes: 'all', vel: 0.7, dur: '4n' }, time);
+      const ev = this.events[step];
+      // 换和弦那一刻若织体这一步没有低音，补一个低音+整和弦，让切换清晰可闻
+      if (changed && !ev?.bass.length) {
+        this._play(chord, { bass: ['root'], notes: 'all', vel: 0.7, dur: 4, bassDur: 4 }, time);
       } else if (ev) {
         this._play(chord, ev, time);
       }
@@ -139,9 +149,10 @@ export class Engine {
   _play(chord, ev, time) {
     const ext = [...this.voicing, this.voicing[0] + 12];
     const notes = ev.notes === 'all' ? [...this.voicing] : ev.notes.map((i) => ext[i]);
-    const bass = bassNote(chord.root);
-    if (ev.bass) notes.push(bass);
-    if (ev.bassFifth) notes.push(bassNote((chord.root + 7) % 12));
-    this.piano.triggerAttackRelease(notes.map(midiToNote), ev.dur, time, ev.vel);
+    const sec = this.stepSeconds();
+    if (notes.length) this.piano.triggerAttackRelease(notes.map(midiToNote), ev.dur * sec, time, ev.vel);
+    const bass = ev.bass.map((b) => (
+      b === 'fifth' ? bassNote((chord.root + 7) % 12) : bassNote(chord.root) + (b === 'octave' ? 12 : 0)));
+    if (bass.length) this.piano.triggerAttackRelease(bass.map(midiToNote), ev.bassDur * sec, time, Math.min(1, ev.vel + 0.05));
   }
 }
