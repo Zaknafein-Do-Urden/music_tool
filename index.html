@@ -15,34 +15,32 @@
 <body>
   <main class="app">
     <header class="controls">
-      <label class="field">
-        <span>调</span>
-        <select id="key"></select>
-      </label>
-      <label class="field">
-        <span>伴奏</span>
-        <select id="pattern"></select>
-      </label>
-      <label class="field">
-        <span>换和弦</span>
-        <select id="quantize">
-          <option value="beat">下一拍</option>
-          <option value="bar">下一小节</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>拍号</span>
-        <select id="meter"></select>
-      </label>
-      <label class="field bpm">
-        <span>速度 <b id="bpm-value">80</b></span>
-        <input id="bpm" type="range" min="50" max="150" step="1" value="80">
-      </label>
+      <div class="keybar">
+        <button class="step" id="key-down" type="button" aria-label="降半音">▼</button>
+        <select id="key" aria-label="调"></select>
+        <button class="step" id="key-up" type="button" aria-label="升半音">▲</button>
+        <div class="seg" id="mode" role="group" aria-label="大调或小调"></div>
+      </div>
+      <div class="tempo">
+        <label class="field meter">
+          <span>拍号</span>
+          <select id="meter"></select>
+        </label>
+        <label class="field bpm">
+          <span>速度 <b id="bpm-value">80</b></span>
+          <input id="bpm" type="range" min="50" max="150" step="1" value="80">
+        </label>
+      </div>
     </header>
 
     <div class="beats" id="beats" aria-hidden="true"></div>
 
     <section class="pads" id="pads"></section>
+
+    <div class="toolbar">
+      <div class="seg small" id="pattern" role="group" aria-label="伴奏"></div>
+      <div class="seg small" id="quantize" role="group" aria-label="换和弦时机"></div>
+    </div>
 
     <footer class="footer">
       <p class="status" id="status">正在加载钢琴音色…</p>

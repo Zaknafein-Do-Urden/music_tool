@@ -34,9 +34,45 @@ html, body {
 }
 
 .controls {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.keybar {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.keybar select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #333849;
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  text-align-last: center;
+}
+.step {
+  width: 48px;
+  border: 1px solid #333849;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 16px;
+  touch-action: manipulation;
+}
+.step:active { background: #333849; }
+
+.tempo {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
 }
 
 .field {
@@ -53,13 +89,45 @@ html, body {
   color: var(--text);
   border: 1px solid #333849;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   font-size: 16px;
 }
 
-.field.bpm { grid-column: 2 / -1; justify-content: space-between; }
+.field.meter { width: 72px; }
+.field.bpm { flex: 1; }
 .field.bpm b { color: var(--text); font-weight: 600; }
 .field input[type=range] { width: 100%; accent-color: var(--pad-active); }
+
+/* 分段按钮：伴奏风格、换和弦时机、大小调 */
+.seg {
+  display: flex;
+  background: var(--panel);
+  border: 1px solid #333849;
+  border-radius: 12px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg button {
+  flex: 1;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  padding: 6px 10px;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.seg button[aria-pressed="true"] { background: #3a4052; color: var(--text); font-weight: 600; }
+.seg.small button { font-size: 13px; padding: 5px 8px; }
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+}
+.toolbar .seg:first-child { flex: 3; }
+.toolbar .seg:last-child { flex: 2; }
 
 .beats {
   display: flex;

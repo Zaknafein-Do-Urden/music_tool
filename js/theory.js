@@ -3,31 +3,44 @@
 const SHARP_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
-// 12 个大调，主音音级 + 是否用降号拼写
-export const KEYS = [
-  { name: 'C', tonic: 0, flat: false },
-  { name: 'Db', tonic: 1, flat: true },
-  { name: 'D', tonic: 2, flat: false },
-  { name: 'Eb', tonic: 3, flat: true },
-  { name: 'E', tonic: 4, flat: false },
-  { name: 'F', tonic: 5, flat: true },
-  { name: 'F#', tonic: 6, flat: false },
-  { name: 'G', tonic: 7, flat: false },
-  { name: 'Ab', tonic: 8, flat: true },
-  { name: 'A', tonic: 9, flat: false },
-  { name: 'Bb', tonic: 10, flat: true },
-  { name: 'B', tonic: 11, flat: false },
-];
+// 调 = 主音音级 + 调式。降号拼写按调号习惯：大调 Db Eb F Ab Bb；小调 Cm Dm Ebm Fm Gm Bbm
+const FLAT_TONICS = {
+  major: [1, 3, 5, 8, 10],
+  minor: [0, 2, 3, 5, 7, 10],
+};
 
-// 大调里最常用的 6 个顺阶和弦：1 2m 3m 4 5 6m
-export const DEGREES = [
-  { label: '1', offset: 0, minor: false, hint: '家·稳定' },
-  { label: '2m', offset: 2, minor: true, hint: '过渡' },
-  { label: '3m', offset: 4, minor: true, hint: '柔和' },
-  { label: '4', offset: 5, minor: false, hint: '展开·温暖' },
-  { label: '5', offset: 7, minor: false, hint: '紧张·想回家' },
-  { label: '6m', offset: 9, minor: true, hint: '伤感' },
-];
+export const MODES = {
+  major: {
+    name: '大调',
+    // 大调里最常用的 6 个顺阶和弦：1 2m 3m 4 5 6m
+    degrees: [
+      { label: '1', offset: 0, minor: false, hint: '家·稳定' },
+      { label: '2m', offset: 2, minor: true, hint: '过渡' },
+      { label: '3m', offset: 4, minor: true, hint: '柔和' },
+      { label: '4', offset: 5, minor: false, hint: '展开·温暖' },
+      { label: '5', offset: 7, minor: false, hint: '紧张·想回家' },
+      { label: '6m', offset: 9, minor: true, hint: '伤感' },
+    ],
+  },
+  minor: {
+    name: '小调',
+    // 小调流行歌最常用的 6 个：1m 3 4m 5 6 7。5 用大三和弦（和声小调），回到 1m 的感觉更强
+    degrees: [
+      { label: '1m', offset: 0, minor: true, hint: '家·忧郁' },
+      { label: '3', offset: 3, minor: false, hint: '明亮' },
+      { label: '4m', offset: 5, minor: true, hint: '深沉' },
+      { label: '5', offset: 7, minor: false, hint: '紧张·想回家' },
+      { label: '6', offset: 8, minor: false, hint: '温暖·展开' },
+      { label: '7', offset: 10, minor: false, hint: '推进' },
+    ],
+  },
+};
+
+export function makeKey(tonic, mode = 'major') {
+  const t = ((tonic % 12) + 12) % 12;
+  const flat = FLAT_TONICS[mode].includes(t);
+  return { tonic: t, mode, flat, name: pcName(t, flat) + (mode === 'minor' ? 'm' : '') };
+}
 
 export function pcName(pc, flat) {
   return (flat ? FLAT_NAMES : SHARP_NAMES)[((pc % 12) + 12) % 12];
@@ -35,7 +48,7 @@ export function pcName(pc, flat) {
 
 // 某调某级的和弦：{ root 音级, pcs 三个音级, name 如 "Am" }
 export function chordFor(key, degreeIndex) {
-  const d = DEGREES[degreeIndex];
+  const d = MODES[key.mode].degrees[degreeIndex];
   const root = (key.tonic + d.offset) % 12;
   const third = (root + (d.minor ? 3 : 4)) % 12;
   const fifth = (root + 7) % 12;

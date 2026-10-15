@@ -1,17 +1,30 @@
 import assert from 'node:assert/strict';
-import { KEYS, DEGREES, chordFor, voiceChord, bassNote } from '../js/theory.js';
+import { MODES, makeKey, chordFor, voiceChord, bassNote } from '../js/theory.js';
 
-const names = (keyName) => DEGREES.map((_, i) => chordFor(KEYS.find((k) => k.name === keyName), i).name);
+const NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+const names = (keyName, mode = 'major') => {
+  const key = makeKey(NAMES.indexOf(keyName), mode);
+  return MODES[mode].degrees.map((_, i) => chordFor(key, i).name);
+};
 
 assert.deepEqual(names('C'), ['C', 'Dm', 'Em', 'F', 'G', 'Am']);
 assert.deepEqual(names('G'), ['G', 'Am', 'Bm', 'C', 'D', 'Em']);
 assert.deepEqual(names('Eb'), ['Eb', 'Fm', 'Gm', 'Ab', 'Bb', 'Cm']);
 assert.deepEqual(names('B'), ['B', 'C#m', 'D#m', 'E', 'F#', 'G#m']);
 
+// 小调：1m 3 4m 5 6 7
+assert.deepEqual(names('A', 'minor'), ['Am', 'C', 'Dm', 'E', 'F', 'G']);
+assert.deepEqual(names('E', 'minor'), ['Em', 'G', 'Am', 'B', 'C', 'D']);
+assert.deepEqual(names('D', 'minor'), ['Dm', 'F', 'Gm', 'A', 'Bb', 'C']);
+assert.equal(makeKey(-2, 'minor').name, 'Bbm');
+assert.equal(makeKey(13).name, 'Db');
+
 // 每个调每个和弦都能排出三音、在音域内、音级正确
-for (const key of KEYS) {
+const ALL_KEYS = Object.keys(MODES).flatMap((mode) => Array.from({ length: 12 }, (_, t) => makeKey(t, mode)));
+for (const key of ALL_KEYS) {
   let prev = null;
-  for (let i = 0; i < DEGREES.length; i++) {
+  for (let i = 0; i < MODES[key.mode].degrees.length; i++) {
     const chord = chordFor(key, i);
     const v = voiceChord(chord.pcs, prev);
     assert.equal(v.length, 3, `${key.name} ${chord.name}`);
