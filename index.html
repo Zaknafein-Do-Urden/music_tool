@@ -30,15 +30,17 @@
           <option value="bar">下一小节</option>
         </select>
       </label>
+      <label class="field">
+        <span>拍号</span>
+        <select id="meter"></select>
+      </label>
       <label class="field bpm">
         <span>速度 <b id="bpm-value">80</b></span>
         <input id="bpm" type="range" min="50" max="150" step="1" value="80">
       </label>
     </header>
 
-    <div class="beats" id="beats" aria-hidden="true">
-      <i></i><i></i><i></i><i></i>
-    </div>
+    <div class="beats" id="beats" aria-hidden="true"></div>
 
     <section class="pads" id="pads"></section>
 

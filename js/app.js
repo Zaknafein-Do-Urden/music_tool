@@ -1,11 +1,11 @@
 import { KEYS, DEGREES, chordFor } from './theory.js';
-import { Engine, PATTERNS } from './engine.js';
+import { Engine, PATTERNS, METERS } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  key: $('key'), pattern: $('pattern'), quantize: $('quantize'),
+  key: $('key'), pattern: $('pattern'), quantize: $('quantize'), meter: $('meter'),
   bpm: $('bpm'), bpmValue: $('bpm-value'), pads: $('pads'),
-  beats: [...$('beats').children], status: $('status'), stop: $('stop'),
+  beats: $('beats'), status: $('status'), stop: $('stop'),
 };
 
 // 设置只存本机，读写失败（隐私模式等）就用默认值
@@ -17,7 +17,7 @@ function saveSettings() {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
       key: els.key.value, pattern: els.pattern.value,
-      quantize: els.quantize.value, bpm: els.bpm.value,
+      quantize: els.quantize.value, meter: els.meter.value, bpm: els.bpm.value,
     }));
   } catch {}
 }
@@ -25,9 +25,11 @@ function saveSettings() {
 const saved = loadSettings();
 els.key.innerHTML = KEYS.map((k, i) => `<option value="${i}">${k.name} 大调</option>`).join('');
 els.pattern.innerHTML = Object.entries(PATTERNS).map(([id, p]) => `<option value="${id}">${p.name}</option>`).join('');
+els.meter.innerHTML = Object.keys(METERS).map((id) => `<option value="${id}">${id}</option>`).join('');
 els.key.value = saved.key ?? '0';
 els.pattern.value = saved.pattern ?? 'block';
 els.quantize.value = saved.quantize ?? 'beat';
+els.meter.value = saved.meter ?? '4/4';
 els.bpm.value = saved.bpm ?? '80';
 els.bpmValue.textContent = els.bpm.value;
 
@@ -52,15 +54,21 @@ function renderChordNames() {
   });
 }
 
-function renderState({ step, current, pending }) {
+// 拍点指示：每拍一个圆点，第一拍（强拍）更亮
+function renderBeats() {
+  els.beats.innerHTML = '<i></i>'.repeat(METERS[els.meter.value].beats.length);
+}
+
+function renderState({ beat, current, pending }) {
   pads.forEach((btn, i) => {
     btn.classList.toggle('active', i === current);
     btn.classList.toggle('pending', i === pending);
   });
-  if (step !== null && step !== undefined) {
-    els.beats.forEach((b, i) => b.classList.toggle('on', step % 2 === 0 && i === step / 2));
+  const dots = [...els.beats.children];
+  if (beat >= 0) {
+    dots.forEach((b, i) => b.classList.toggle('on', i === beat));
   } else if (current === null) {
-    els.beats.forEach((b) => b.classList.remove('on'));
+    dots.forEach((b) => b.classList.remove('on'));
   }
 }
 
@@ -74,8 +82,10 @@ const engine = new Engine({
 engine.setKey(KEYS[+els.key.value]);
 engine.setPattern(els.pattern.value);
 engine.setQuantize(els.quantize.value);
+engine.setMeter(els.meter.value);
 engine.setBpm(+els.bpm.value);
 renderChordNames();
+renderBeats();
 
 els.key.addEventListener('change', () => {
   engine.setKey(KEYS[+els.key.value]);
@@ -84,6 +94,11 @@ els.key.addEventListener('change', () => {
 });
 els.pattern.addEventListener('change', () => { engine.setPattern(els.pattern.value); saveSettings(); });
 els.quantize.addEventListener('change', () => { engine.setQuantize(els.quantize.value); saveSettings(); });
+els.meter.addEventListener('change', () => {
+  engine.setMeter(els.meter.value);
+  renderBeats();
+  saveSettings();
+});
 els.bpm.addEventListener('input', () => {
   els.bpmValue.textContent = els.bpm.value;
   engine.setBpm(+els.bpm.value);

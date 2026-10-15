@@ -1,6 +1,9 @@
 // 伴奏引擎：Tone.js 钢琴采样 + 按八分音符步进的节奏型。
 // 点按钮不是"播一下"，而是排队一个和弦，在下一拍/下一小节切换；节奏由 Transport 保证。
 import { chordFor, voiceChord, bassNote } from './theory.js';
+import { METERS, PATTERNS } from './patterns.js';
+
+export { METERS, PATTERNS };
 
 const Tone = window.Tone;
 
@@ -17,42 +20,6 @@ function sampleUrls() {
   return urls;
 }
 
-// 节奏型：一小节 8 个八分音符步。notes 用索引引用右手音：0–2 为三和弦排列，3 为最低音高八度；'all' 为整个和弦
-export const PATTERNS = {
-  block: {
-    name: '柱式',
-    steps: {
-      0: { bass: true, notes: 'all', vel: 0.8, dur: '2n' },
-      2: { notes: 'all', vel: 0.5, dur: '4n' },
-      4: { bass: true, notes: 'all', vel: 0.7, dur: '2n' },
-      6: { notes: 'all', vel: 0.5, dur: '4n' },
-    },
-  },
-  arpeggio: {
-    name: '分解',
-    steps: {
-      0: { bass: true, notes: [0], vel: 0.7, dur: '2n' },
-      1: { notes: [1], vel: 0.5, dur: '4n' },
-      2: { notes: [2], vel: 0.55, dur: '4n' },
-      3: { notes: [3], vel: 0.5, dur: '4n' },
-      4: { bass: true, notes: [2], vel: 0.6, dur: '2n' },
-      5: { notes: [1], vel: 0.5, dur: '4n' },
-      6: { notes: [2], vel: 0.5, dur: '4n' },
-      7: { notes: [1], vel: 0.45, dur: '4n' },
-    },
-  },
-  ballad: {
-    name: '抒情',
-    steps: {
-      0: { bass: true, notes: 'all', vel: 0.75, dur: '2n' },
-      3: { notes: [2], vel: 0.45, dur: '8n' },
-      4: { bassFifth: true, notes: [0], vel: 0.55, dur: '4n' },
-      6: { notes: 'all', vel: 0.5, dur: '4n' },
-      7: { notes: [3], vel: 0.4, dur: '8n' },
-    },
-  },
-};
-
 const midiToNote = (m) => Tone.Frequency(m, 'midi').toNote();
 
 export class Engine {
@@ -60,6 +27,8 @@ export class Engine {
     this.onStep = onStep;
     this.key = null;
     this.pattern = PATTERNS.block;
+    this.meter = METERS['4/4'];
+    this.bpm = 80;
     this.quantize = 'beat'; // 'beat' | 'bar'
     this.current = null; // 当前级数索引
     this.pending = null; // 排队中的级数索引
@@ -83,8 +52,17 @@ export class Engine {
     this.key = key;
     if (this.current !== null) this.voicing = this._voice(this.current, this.voicing);
   }
-  setBpm(bpm) { Tone.Transport.bpm.rampTo(bpm, 0.1); }
+  // bpm 指"每分钟几拍"；6/8 的一拍是附点四分音符，换算成 Transport 的四分音符速度
+  setBpm(bpm) {
+    this.bpm = bpm;
+    Tone.Transport.bpm.rampTo(bpm * (this.meter.bpmScale ?? 1), 0.1);
+  }
   setPattern(id) { this.pattern = PATTERNS[id]; }
+  setMeter(id) {
+    this.meter = METERS[id];
+    this.step %= this.meter.steps;
+    this.setBpm(this.bpm);
+  }
   setQuantize(q) { this.quantize = q; }
 
   // 用户点了某个和弦按钮
@@ -110,6 +88,7 @@ export class Engine {
 
   stop() {
     Tone.Transport.stop();
+    Tone.Draw.cancel(0);
     this.piano.releaseAll();
     this.current = null;
     this.pending = null;
@@ -126,9 +105,9 @@ export class Engine {
 
   _tick(time) {
     const step = this.step;
-    this.step = (step + 1) % 8;
+    this.step = (step + 1) % this.meter.steps;
 
-    const boundary = this.quantize === 'bar' ? step === 0 : step % 2 === 0;
+    const boundary = this.quantize === 'bar' ? step === 0 : this.meter.beats.includes(step);
     let changed = false;
     if (this.pending !== null && boundary) {
       this.current = this.pending;
@@ -139,7 +118,7 @@ export class Engine {
 
     if (this.current !== null) {
       const chord = chordFor(this.key, this.current);
-      const ev = this.pattern.steps[step];
+      const ev = this.pattern.meters[this.meter.name][step];
       // 换和弦那一刻若节奏型这一步没有低音，补一个低音+整和弦，让切换清晰可闻
       if (changed && !(ev && (ev.bass || ev.bassFifth))) {
         this._play(chord, { bass: true, notes: 'all', vel: 0.7, dur: '4n' }, time);
@@ -150,7 +129,8 @@ export class Engine {
 
     const current = this.current;
     const pending = this.pending;
-    Tone.Draw.schedule(() => this.onStep?.({ step, current, pending, changed }), time);
+    const beat = this.meter.beats.indexOf(step);
+    Tone.Draw.schedule(() => this.onStep?.({ step, beat, current, pending, changed }), time);
   }
 
   _play(chord, ev, time) {

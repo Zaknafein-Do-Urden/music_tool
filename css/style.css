@@ -57,7 +57,7 @@ html, body {
   font-size: 16px;
 }
 
-.field.bpm { grid-column: 1 / -1; }
+.field.bpm { grid-column: 2 / -1; justify-content: space-between; }
 .field.bpm b { color: var(--text); font-weight: 600; }
 .field input[type=range] { width: 100%; accent-color: var(--pad-active); }
 
