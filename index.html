@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="即兴伴奏">
+  <meta name="theme-color" content="#14161c">
+  <title>即兴伴奏</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="controls">
+      <label class="field">
+        <span>调</span>
+        <select id="key"></select>
+      </label>
+      <label class="field">
+        <span>伴奏</span>
+        <select id="pattern"></select>
+      </label>
+      <label class="field">
+        <span>换和弦</span>
+        <select id="quantize">
+          <option value="beat">下一拍</option>
+          <option value="bar">下一小节</option>
+        </select>
+      </label>
+      <label class="field bpm">
+        <span>速度 <b id="bpm-value">80</b></span>
+        <input id="bpm" type="range" min="50" max="150" step="1" value="80">
+      </label>
+    </header>
+
+    <div class="beats" id="beats" aria-hidden="true">
+      <i></i><i></i><i></i><i></i>
+    </div>
+
+    <section class="pads" id="pads"></section>
+
+    <footer class="footer">
+      <p class="status" id="status">正在加载钢琴音色…</p>
+      <button class="stop" id="stop" type="button">停止</button>
+    </footer>
+  </main>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
