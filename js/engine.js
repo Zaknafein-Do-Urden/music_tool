@@ -98,6 +98,9 @@ export class Engine {
 
   get playing() { return Tone.Transport.state === 'started'; }
 
+  // 一小节多少秒（引擎每步是一个八分音符）
+  barSeconds() { return (this.meter.steps * 30) / Tone.Transport.bpm.value; }
+
   _voice(degree, prev) {
     const chord = chordFor(this.key, degree);
     return voiceChord(chord.pcs, prev);

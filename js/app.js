@@ -1,5 +1,10 @@
 import { MODES, makeKey, chordFor } from './theory.js';
 import { Engine, PATTERNS, METERS } from './engine.js';
+import { Mic } from './mic.js';
+import { midiName } from './pitch.js';
+import { segmentNotes, estimateKey, framesHistogram } from './analysis.js';
+import { suggestChords, ChordMemory } from './suggest.js';
+import { Recorder, decodeTake, mixTake, estimateVoiceDelay } from './recorder.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -26,6 +31,7 @@ const state = {
   quantize: saved.quantize === 'bar' ? 'bar' : 'beat',
   meter: METERS[saved.meter] ? saved.meter : '4/4',
   bpm: +(saved.bpm ?? 80),
+  headphones: !!saved.headphones,
 };
 const currentKey = () => makeKey(state.key, state.mode);
 
@@ -47,6 +53,7 @@ function segmented(container, options, get, onChange) {
   });
   const render = () => buttons.forEach(([v, b]) => b.setAttribute('aria-pressed', String(v === get())));
   render();
+  return render;
 }
 
 const pads = MODES.major.degrees.map((_, i) => {
@@ -55,7 +62,11 @@ const pads = MODES.major.degrees.map((_, i) => {
   btn.className = 'pad' + (i === 0 ? ' tonic' : '');
   btn.disabled = true;
   btn.innerHTML = '<span class="degree"></span><span class="name"></span><span class="hint"></span>';
-  btn.addEventListener('pointerdown', (e) => { e.preventDefault(); engine.press(i); });
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    rememberPress(i);
+    engine.press(i);
+  });
   els.pads.appendChild(btn);
   return btn;
 });
@@ -81,6 +92,7 @@ function changeKey(tonic, mode = state.mode) {
   state.mode = mode;
   engine.setKey(currentKey());
   renderKey();
+  renderMode();
   saveSettings();
 }
 
@@ -102,11 +114,13 @@ function renderState({ beat, current, pending }) {
   }
 }
 
+let idleStatus = '正在加载钢琴音色…';
 const engine = new Engine({
   onStep: renderState,
   onLoaded: () => {
     pads.forEach((b) => { b.disabled = false; });
-    els.status.textContent = '点任意和弦开始；先从 1 开始试试';
+    idleStatus = '点任意和弦开始；先从左上角的"家"开始试试';
+    if (!mic.open) els.status.textContent = idleStatus;
   },
 });
 engine.setKey(currentKey());
@@ -122,7 +136,8 @@ els.bpmValue.textContent = els.bpm.value;
 renderKey();
 renderBeats();
 
-segmented(els.mode, Object.entries(MODES).map(([id, m]) => [id, m.name]),
+// 定调结果也会改大小调，所以要能从外面刷新这组按钮
+const renderMode = segmented(els.mode, Object.entries(MODES).map(([id, m]) => [id, m.name]),
   () => state.mode, (m) => changeKey(state.key, m));
 segmented(els.pattern, Object.entries(PATTERNS).map(([id, p]) => [id, p.name]),
   () => state.pattern, (p) => { state.pattern = p; engine.setPattern(p); });
@@ -145,3 +160,279 @@ els.bpm.addEventListener('input', () => {
   saveSettings();
 });
 els.stop.addEventListener('click', () => engine.stop());
+
+// ---------- 麦克风（定调、推荐、录音共用） ----------
+const $$ = (sel, root = document) => root.querySelector(sel);
+const sum = (a) => a.reduce((x, y) => x + y, 0);
+const keyLabel = (tonic, mode) => `${makeKey(tonic, mode).name.replace(/m$/, '')} ${MODES[mode].name}`;
+const fmtTime = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
+const mic = new Mic();
+mic.headphones = state.headphones;
+const recent = []; // 最近 10 秒的音高帧
+mic.onFrame((f) => {
+  recent.push(f);
+  while (recent.length && f.t - recent[0].t > 10) recent.shift();
+  if (!recorder.recording) {
+    els.status.textContent = f.midi !== null && f.clarity >= 0.8 ? `🎤 ${midiName(f.midi)}` : '🎤 …';
+  }
+});
+
+function micError(e) {
+  return e?.name === 'NotAllowedError'
+    ? '没有麦克风权限：请在 Safari 的网站设置里允许麦克风'
+    : `麦克风打不开：${e?.message ?? e}`;
+}
+function releaseMic(user) {
+  mic.release(user);
+  if (!mic.open) els.status.textContent = idleStatus;
+}
+
+// ---------- 阶段 3：实时推荐 ----------
+const MEMORY_KEY = 'music_tool.memory';
+const memory = new ChordMemory((() => { try { return JSON.parse(localStorage.getItem(MEMORY_KEY)) ?? []; } catch { return []; } })());
+let suggestTimer = null;
+let memorySaveTimer = null;
+
+const recentHist = () => framesHistogram(recent, performance.now() / 1000, Math.max(1.5, engine.barSeconds()));
+
+function renderSuggest(list) {
+  const [a, b] = list;
+  pads.forEach((btn, i) => {
+    btn.classList.toggle('suggest', !!a && i === a.degree);
+    btn.classList.toggle('suggest2', !!b && i === b.degree && b.score >= a.score * 0.75);
+  });
+}
+
+// 用户按和弦时记下"刚才唱的旋律 → 按了哪个"，以后唱到相似旋律就推荐它
+function rememberPress(degree) {
+  if (!suggestTimer) return;
+  const hist = recentHist();
+  if (sum(hist) < 0.25) return;
+  memory.record(currentKey(), hist, degree);
+  clearTimeout(memorySaveTimer);
+  memorySaveTimer = setTimeout(() => {
+    try { localStorage.setItem(MEMORY_KEY, JSON.stringify(memory)); } catch {}
+  }, 1000);
+}
+
+const suggestBtn = $('suggest-toggle');
+suggestBtn.addEventListener('click', async () => {
+  if (suggestTimer) {
+    clearInterval(suggestTimer);
+    suggestTimer = null;
+    renderSuggest([]);
+    suggestBtn.setAttribute('aria-pressed', 'false');
+    releaseMic('suggest');
+    return;
+  }
+  try {
+    await mic.acquire('suggest');
+  } catch (e) {
+    els.status.textContent = micError(e);
+    return;
+  }
+  suggestBtn.setAttribute('aria-pressed', 'true');
+  suggestTimer = setInterval(() => {
+    renderSuggest(suggestChords({ key: currentKey(), hist: recentHist(), current: engine.current, memory }));
+  }, 150);
+});
+
+// ---------- 耳机模式 ----------
+const headphonesBtn = $('headphones');
+headphonesBtn.setAttribute('aria-pressed', String(state.headphones));
+headphonesBtn.addEventListener('click', async () => {
+  if (recorder.recording) return;
+  state.headphones = !state.headphones;
+  headphonesBtn.setAttribute('aria-pressed', String(state.headphones));
+  saveSettings();
+  try { await mic.setHeadphones(state.headphones); } catch (e) { els.status.textContent = micError(e); }
+});
+
+// ---------- 阶段 2：哼几句定调 ----------
+const detect = {
+  dialog: $('detect-dialog'), start: $('detect-start'), apply: $('detect-apply'), close: $('detect-close'),
+  note: $('detect-note'), seconds: $('detect-seconds'), progress: $('detect-progress'),
+  result: $('detect-result'), key: $('detect-key'), detail: $('detect-detail'),
+  frames: [], unsub: null, timer: null, est: null,
+};
+const CONFIDENCE = {
+  high: '把握较大。',
+  mid: '把握一般，多唱几句会更准。',
+  low: '把握较小，建议多唱几句，尤其是乐句结尾的长音。',
+};
+
+function detectAnalyze() {
+  const notes = segmentNotes(detect.frames);
+  const secs = sum(notes.map((n) => n.dur));
+  detect.seconds.textContent = `${Math.round(secs)} 秒`;
+  detect.progress.style.width = `${Math.min(100, (secs / 12) * 100)}%`;
+  const est = estimateKey(notes);
+  if (!est) return;
+  detect.est = est;
+  detect.key.textContent = keyLabel(est.best.tonic, est.best.mode);
+  detect.detail.textContent = CONFIDENCE[est.confidence]
+    + `也可以用 ${keyLabel(est.alt.tonic, est.alt.mode)}（和弦是同一组，只是哪个算"家"不同）。`
+    + `你唱到的音域：${midiName(est.range.lo)}–${midiName(est.range.hi)}。`;
+  detect.result.hidden = false;
+  detect.apply.hidden = false;
+}
+
+function detectStop() {
+  if (!detect.timer) return;
+  clearInterval(detect.timer);
+  detect.timer = null;
+  detect.unsub();
+  releaseMic('detect');
+  detectAnalyze();
+  detect.start.textContent = '重新开始';
+  detect.note.textContent = '—';
+}
+
+$('detect-open').addEventListener('click', () => {
+  detect.result.hidden = true;
+  detect.apply.hidden = true;
+  detect.start.textContent = '开始';
+  detect.seconds.textContent = '0 秒';
+  detect.progress.style.width = '0';
+  detect.dialog.showModal();
+});
+detect.start.addEventListener('click', async () => {
+  if (detect.timer) { detectStop(); return; }
+  engine.stop(); // 伴奏会被麦克风收进去，定调时先停
+  try {
+    await mic.acquire('detect');
+  } catch (e) {
+    detect.key.textContent = '';
+    detect.detail.textContent = micError(e);
+    detect.result.hidden = false;
+    return;
+  }
+  detect.frames = [];
+  detect.est = null;
+  detect.result.hidden = true;
+  detect.apply.hidden = true;
+  detect.unsub = mic.onFrame((f) => {
+    detect.frames.push(f);
+    detect.note.textContent = f.midi !== null && f.clarity >= 0.8 ? midiName(f.midi) : '…';
+  });
+  detect.timer = setInterval(detectAnalyze, 500);
+  detect.start.textContent = '结束';
+});
+detect.apply.addEventListener('click', () => {
+  if (detect.est) changeKey(detect.est.best.tonic, detect.est.best.mode);
+  detect.dialog.close();
+});
+detect.close.addEventListener('click', () => detect.dialog.close());
+detect.dialog.addEventListener('close', detectStop);
+
+// ---------- 阶段 4：录音 ----------
+const recorder = new Recorder({ mic, source: engine.piano });
+const takes = [];
+let takeSeq = 0;
+let recTimer = null;
+const recBtn = $('record');
+const takesList = $('takes-list');
+const takesDialog = $('takes-dialog');
+
+recBtn.addEventListener('click', async () => {
+  if (recorder.recording) {
+    clearInterval(recTimer);
+    recBtn.setAttribute('aria-pressed', 'false');
+    recBtn.textContent = '● 录音';
+    headphonesBtn.disabled = false;
+    const raw = await recorder.stop();
+    els.status.textContent = idleStatus;
+    addTake(raw);
+    takesDialog.showModal();
+    return;
+  }
+  try {
+    await recorder.start();
+  } catch (e) {
+    els.status.textContent = micError(e);
+    return;
+  }
+  headphonesBtn.disabled = true;
+  recBtn.setAttribute('aria-pressed', 'true');
+  const t0 = performance.now();
+  const tick = () => {
+    recBtn.textContent = `■ ${fmtTime((performance.now() - t0) / 1000)}`;
+    els.status.textContent = state.headphones ? '录音中' : '录音中（戴耳机效果更好）';
+  };
+  tick();
+  recTimer = setInterval(tick, 500);
+});
+
+function addTake(raw) {
+  const take = {
+    id: ++takeSeq, decoded: null, blob: null, url: null,
+    voiceGain: 1, accGain: 0.8, delay: estimateVoiceDelay(),
+  };
+  takes.unshift(take);
+  $('takes-count').textContent = takes.length;
+
+  const el = document.createElement('div');
+  el.className = 'take';
+  el.innerHTML = `
+    <div class="title"><span>录音 ${take.id}</span><span>${fmtTime(raw.seconds)}</span></div>
+    <div class="state">混音中…</div>
+    <audio controls preload="auto" hidden></audio>
+    <label>人声<input type="range" data-k="voiceGain" min="0" max="1.5" step="0.05" value="${take.voiceGain}"><span></span></label>
+    <label>伴奏<input type="range" data-k="accGain" min="0" max="1.5" step="0.05" value="${take.accGain}"><span></span></label>
+    <label>人声对齐<input type="range" data-k="delay" min="-0.1" max="0.3" step="0.01" value="${take.delay}"><span></span></label>
+    <div class="row"><button type="button" data-act="del">删除</button><button type="button" data-act="save">保存/分享</button></div>`;
+  takesList.prepend(el);
+
+  const audio = $$('audio', el);
+  const stateEl = $$('.state', el);
+  const showValues = () => el.querySelectorAll('input').forEach((inp) => {
+    const v = +inp.value;
+    inp.nextElementSibling.textContent = inp.dataset.k === 'delay' ? `${Math.round(v * 1000)}ms` : `${Math.round(v * 100)}%`;
+  });
+  let remixTimer = null;
+  const remix = async () => {
+    try {
+      take.decoded ??= await decodeTake(raw);
+      take.blob = await mixTake(take.decoded, { voiceGain: take.voiceGain, accGain: take.accGain, voiceDelay: take.delay });
+      if (take.url) URL.revokeObjectURL(take.url);
+      take.url = URL.createObjectURL(take.blob);
+      audio.src = take.url;
+      audio.hidden = false;
+      stateEl.textContent = '';
+    } catch (e) {
+      stateEl.textContent = `混音失败：${e?.message ?? e}`;
+    }
+  };
+  el.querySelectorAll('input').forEach((inp) => inp.addEventListener('input', () => {
+    take[inp.dataset.k] = +inp.value;
+    showValues();
+    clearTimeout(remixTimer);
+    stateEl.textContent = '混音中…';
+    remixTimer = setTimeout(remix, 400);
+  }));
+  $$('[data-act=del]', el).addEventListener('click', () => {
+    if (take.url) URL.revokeObjectURL(take.url);
+    takes.splice(takes.indexOf(take), 1);
+    $('takes-count').textContent = takes.length;
+    el.remove();
+  });
+  $$('[data-act=save]', el).addEventListener('click', async () => {
+    if (!take.blob) return;
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    const file = new File([take.blob], `即兴伴奏-${stamp}.wav`, { type: 'audio/wav' });
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); } catch {}
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = take.url;
+    a.download = file.name;
+    a.click();
+  });
+  showValues();
+  remix();
+}
+
+$('takes-open').addEventListener('click', () => takesDialog.showModal());
+$('takes-close').addEventListener('click', () => takesDialog.close());

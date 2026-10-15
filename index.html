@@ -31,6 +31,12 @@
           <input id="bpm" type="range" min="50" max="150" step="1" value="80">
         </label>
       </div>
+      <div class="micbar">
+        <button class="chip" id="detect-open" type="button">🎤 定调</button>
+        <button class="chip" id="suggest-toggle" type="button" aria-pressed="false">💡 推荐</button>
+        <button class="chip" id="headphones" type="button" aria-pressed="false">🎧 耳机</button>
+        <button class="chip" id="takes-open" type="button">录音 <span id="takes-count">0</span></button>
+      </div>
     </header>
 
     <div class="beats" id="beats" aria-hidden="true"></div>
@@ -44,9 +50,38 @@
 
     <footer class="footer">
       <p class="status" id="status">正在加载钢琴音色…</p>
+      <button class="rec" id="record" type="button" aria-pressed="false">● 录音</button>
       <button class="stop" id="stop" type="button">停止</button>
     </footer>
   </main>
+
+  <dialog class="sheet" id="detect-dialog">
+    <h2>哼几句定调</h2>
+    <p class="hint">清唱或哼你想唱的歌 10–20 秒，不用伴奏。唱到乐句结尾的长音最有帮助。</p>
+    <div class="live">
+      <div>现在的音<b id="detect-note">—</b></div>
+      <div>已收集<b id="detect-seconds">0 秒</b></div>
+    </div>
+    <div class="meter-bar"><i id="detect-progress"></i></div>
+    <div class="result" id="detect-result" hidden>
+      <p class="big">推荐 <b id="detect-key"></b></p>
+      <p id="detect-detail"></p>
+    </div>
+    <div class="actions">
+      <button type="button" id="detect-start" class="primary">开始</button>
+      <button type="button" id="detect-apply" class="primary" hidden>用这个调</button>
+      <button type="button" id="detect-close">关闭</button>
+    </div>
+  </dialog>
+
+  <dialog class="sheet" id="takes-dialog">
+    <h2>录音</h2>
+    <p class="hint">刷新页面后录音会消失，喜欢的请及时保存。戴耳机录的效果最好。</p>
+    <div id="takes-list"></div>
+    <div class="actions">
+      <button type="button" id="takes-close">关闭</button>
+    </div>
+  </dialog>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
