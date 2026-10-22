@@ -69,10 +69,11 @@ function closedVoicings(pcs, lo, hi) {
   return result;
 }
 
-// 右手和弦排列：选和上一个排列移动最小的转位（声部进行平滑），首个和弦靠近 D4
+// 和弦排列：选和上一个排列移动最小的转位（声部进行平滑）；首个和弦靠近音区偏下的位置（默认音区即 C4 附近）
 export function voiceChord(pcs, prev, lo = 55, hi = 74) {
   const candidates = closedVoicings(pcs, lo, hi);
-  const target = prev ?? [60, 62, 66];
+  const base = Math.round(lo + (hi - lo) * 0.28);
+  const target = prev ?? [base, base + 2, base + 6];
   let best = candidates[0];
   let bestCost = Infinity;
   for (const v of candidates) {
@@ -85,4 +86,22 @@ export function voiceChord(pcs, prev, lo = 55, hi = 74) {
 // 左手低音：根音放在 E2(40)–Eb3(51) 之间
 export function bassNote(rootPc, lo = 40) {
   return lo + ((rootPc - lo % 12) + 12) % 12;
+}
+
+// 强力和弦（摇滚吉他）：根音 + 五度 + 高八度根音，不带三音，失真下也干净
+export function powerChord(rootPc, lo = 40) {
+  const r = bassNote(rootPc, lo);
+  return [r, r + 7, r + 12];
+}
+
+// 五声音阶"梯子"：从不低于 from 的和弦根音开始往上，只走宫商角徵羽（大调 1 2 3 5 6；小调用同组音 1 b3 4 5 b7）。
+// 中式织体用它弹琶音、刮奏，即使和弦不变也有中国味
+export function pentaLadder(key, rootPc, from, count = 10) {
+  const steps = key.mode === 'major' ? [0, 2, 4, 7, 9] : [0, 3, 5, 7, 10];
+  const pcs = steps.map((s) => (key.tonic + s) % 12);
+  const ladder = [bassNote(rootPc, from)];
+  for (let m = ladder[0] + 1; ladder.length < count; m++) {
+    if (pcs.includes(m % 12)) ladder.push(m);
+  }
+  return ladder;
 }

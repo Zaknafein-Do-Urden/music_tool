@@ -1,6 +1,6 @@
 import { MODES, makeKey, chordFor } from './theory.js';
-import { Engine, PATTERNS, METERS } from './engine.js';
-import { DEFAULT_FAVORITES } from './patterns.js';
+import { Engine, ENSEMBLES, METERS } from './engine.js';
+import { DEFAULT_ENSEMBLE } from './ensembles.js';
 import { Mic } from './mic.js';
 import { midiName } from './pitch.js';
 import { segmentNotes, estimateKey, framesHistogram } from './analysis.js';
@@ -25,20 +25,39 @@ function saveSettings() {
 }
 
 const saved = loadSettings();
+
+// 每个乐队各记一份：当前织体、常用织体（1–3 个，显示在主界面底部）、各乐器音量增减
+function perEnsemble() {
+  const patterns = {};
+  const favorites = {};
+  const volumes = {};
+  for (const [eid, ens] of Object.entries(ENSEMBLES)) {
+    // 旧版只有钢琴，pattern / favorites 直接存在顶层
+    const oldPattern = eid === 'piano' && typeof saved.pattern === 'string' ? saved.pattern : null;
+    const oldFavs = eid === 'piano' && Array.isArray(saved.favorites) ? saved.favorites : null;
+    const p = saved.patterns?.[eid] ?? oldPattern;
+    patterns[eid] = ens.textures[p] ? p : ens.defaultFavorites[0];
+    const f = (saved.favorites?.[eid] ?? oldFavs ?? []).filter((id) => ens.textures[id]).slice(0, 3);
+    favorites[eid] = f.length ? f : [...ens.defaultFavorites];
+    volumes[eid] = { ...(saved.volumes?.[eid] ?? {}) };
+  }
+  return { patterns, favorites, volumes };
+}
+
 const state = {
   key: +(saved.key ?? 0), // 主音音级 0–11
   mode: MODES[saved.mode] ? saved.mode : 'major',
-  pattern: PATTERNS[saved.pattern] ? saved.pattern : 'block',
+  ensemble: ENSEMBLES[saved.ensemble] ? saved.ensemble : DEFAULT_ENSEMBLE,
+  ...perEnsemble(),
+  fillEvery: [0, 4, 8].includes(saved.fillEvery) ? saved.fillEvery : 0,
   quantize: saved.quantize === 'bar' ? 'bar' : 'beat',
   meter: METERS[saved.meter] ? saved.meter : '4/4',
   bpm: +(saved.bpm ?? 80),
   headphones: !!saved.headphones,
-  // 主界面底部显示的常用织体（1–3 个），完整列表在设置页
-  favorites: (() => {
-    const f = Array.isArray(saved.favorites) ? saved.favorites.filter((id) => PATTERNS[id]).slice(0, 3) : [];
-    return f.length ? f : [...DEFAULT_FAVORITES];
-  })(),
 };
+const ens = () => ENSEMBLES[state.ensemble];
+const curPattern = () => state.patterns[state.ensemble];
+const curFavorites = () => state.favorites[state.ensemble];
 const currentKey = () => makeKey(state.key, state.mode);
 
 // 分段按钮：演奏中一下就能切，不用打开下拉框。pointerdown 比 click 反应更快
@@ -107,7 +126,8 @@ function renderBeats() {
   els.beats.innerHTML = '<i></i>'.repeat(METERS[state.meter].beats.length);
 }
 
-function renderState({ beat, current, pending }) {
+function renderState({ beat, current, pending, fill }) {
+  if (fill !== undefined) $('fill').setAttribute('aria-pressed', String(fill));
   pads.forEach((btn, i) => {
     btn.classList.toggle('active', i === current);
     btn.classList.toggle('pending', i === pending);
@@ -120,18 +140,11 @@ function renderState({ beat, current, pending }) {
   }
 }
 
-let idleStatus = '正在加载钢琴音色…';
-const engine = new Engine({
-  onStep: renderState,
-  onLoaded: () => {
-    pads.forEach((b) => { b.disabled = false; });
-    idleStatus = '点任意和弦开始；先从左上角的"家"开始试试';
-    if (!mic.open) els.status.textContent = idleStatus;
-  },
-});
+let idleStatus = '正在加载音色…';
+const engine = new Engine({ onStep: renderState });
 engine.setKey(currentKey());
-engine.setPattern(state.pattern);
 engine.setQuantize(state.quantize);
+engine.setFillEvery(state.fillEvery);
 engine.setMeter(state.meter);
 engine.setBpm(state.bpm);
 
@@ -148,12 +161,12 @@ const renderMode = segmented(els.mode, Object.entries(MODES).map(([id, m]) => [i
 let renderPatternBar = () => {};
 function buildPatternBar() {
   els.pattern.innerHTML = '';
-  renderPatternBar = segmented(els.pattern, state.favorites.map((id) => [id, PATTERNS[id].name]),
-    () => state.pattern, setPattern);
+  renderPatternBar = segmented(els.pattern, curFavorites().map((id) => [id, ens().textures[id].name]),
+    curPattern, setPattern);
 }
 function setPattern(id) {
-  state.pattern = id;
-  engine.setPattern(id);
+  state.patterns[state.ensemble] = id;
+  if (engine.ensembleId === state.ensemble) engine.setPattern(id);
   renderPatternBar();
   renderPatternList();
   saveSettings();
@@ -345,7 +358,7 @@ detect.close.addEventListener('click', () => detect.dialog.close());
 detect.dialog.addEventListener('close', detectStop);
 
 // ---------- 阶段 4：录音 ----------
-const recorder = new Recorder({ mic, source: engine.piano });
+const recorder = new Recorder({ mic, source: engine.output });
 const takes = [];
 let takeSeq = 0;
 let recTimer = null;
@@ -464,10 +477,10 @@ let hintTimer = null;
 
 function renderPatternList() {
   patternList.innerHTML = '';
-  for (const [id, p] of Object.entries(PATTERNS)) {
+  for (const [id, p] of Object.entries(ens().textures)) {
     const row = document.createElement('div');
-    row.className = 'prow' + (id === state.pattern ? ' current' : '');
-    const fav = state.favorites.includes(id);
+    row.className = 'prow' + (id === curPattern() ? ' current' : '');
+    const fav = curFavorites().includes(id);
     row.innerHTML = `<button type="button" class="pick">${p.name}<small>${p.desc}</small></button>`
       + `<button type="button" class="star" aria-pressed="${fav}" aria-label="${fav ? '取消常用' : '设为常用'}">★</button>`;
     row.querySelector('.pick').addEventListener('click', () => setPattern(id));
@@ -487,15 +500,15 @@ function warn(text) {
 }
 
 function toggleFavorite(id) {
-  const favs = state.favorites;
+  const favs = curFavorites();
   if (favs.includes(id)) {
     if (favs.length === 1) { warn('至少留一个常用织体'); return; }
-    state.favorites = favs.filter((f) => f !== id);
+    state.favorites[state.ensemble] = favs.filter((f) => f !== id);
   } else {
     if (favs.length >= 3) { warn('最多 3 个常用，先点掉一个 ★'); return; }
     // 按完整列表的顺序排，主界面按钮位置稳定
-    const order = Object.keys(PATTERNS);
-    state.favorites = [...favs, id].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    const order = Object.keys(ens().textures);
+    state.favorites[state.ensemble] = [...favs, id].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   }
   buildPatternBar();
   renderPatternList();
@@ -504,6 +517,79 @@ function toggleFavorite(id) {
 
 $('settings-open').addEventListener('click', () => {
   renderPatternList();
+  renderVolumes();
   settingsDialog.showModal();
 });
 $('settings-close').addEventListener('click', () => settingsDialog.close());
+
+// ---------- 乐队切换 ----------
+const ensembleStatus = $('ensemble-status');
+let renderEnsembleSeg = () => {};
+
+async function switchEnsemble(id) {
+  state.ensemble = id;
+  saveSettings();
+  renderEnsembleSeg();
+  buildPatternBar();
+  renderPatternList();
+  renderVolumes();
+  pads.forEach((b) => { b.disabled = true; });
+  const loading = `正在加载${ens().name}音色…（第一次要下载，稍等几秒）`;
+  idleStatus = loading;
+  els.status.textContent = loading;
+  ensembleStatus.textContent = loading;
+  try {
+    if (!(await engine.setEnsemble(id, curPattern()))) return; // 加载期间又换了别的乐队
+  } catch (e) {
+    const msg = `${ENSEMBLES[id].name}音色加载失败（${e?.message ?? e}），检查网络后再点一次乐队`;
+    idleStatus = msg;
+    els.status.textContent = msg;
+    ensembleStatus.textContent = msg;
+    return;
+  }
+  for (const [vid, db] of Object.entries(state.volumes[id])) engine.setVolume(vid, db);
+  pads.forEach((b) => { b.disabled = false; });
+  idleStatus = '点任意和弦开始；先从左上角的"家"开始试试';
+  if (!mic.open) els.status.textContent = idleStatus;
+  ensembleStatus.textContent = `${ens().name}：${Object.values(ens().voices).map((v) => v.name).join('、')}`;
+}
+
+renderEnsembleSeg = segmented($('ensemble'), Object.entries(ENSEMBLES).map(([id, e]) => [id, e.name]),
+  () => state.ensemble, (id) => switchEnsemble(id));
+
+// ---------- 音量 ----------
+const volumesEl = $('volumes');
+const dbLabel = (db) => (db <= -24 ? '静音' : db > 0 ? `+${db}` : String(db));
+function renderVolumes() {
+  volumesEl.innerHTML = '';
+  for (const [vid, v] of Object.entries(ens().voices)) {
+    const db = state.volumes[state.ensemble][vid] ?? 0;
+    const label = document.createElement('label');
+    label.innerHTML = `${v.name}<input type="range" min="-24" max="6" step="1" value="${db}"><span>${dbLabel(db)}</span>`;
+    const input = label.querySelector('input');
+    input.addEventListener('input', () => {
+      const val = +input.value;
+      state.volumes[state.ensemble][vid] = val;
+      label.querySelector('span').textContent = dbLabel(val);
+      if (engine.ensembleId === state.ensemble) engine.setVolume(vid, val);
+      saveSettings();
+    });
+    volumesEl.appendChild(label);
+  }
+}
+
+// ---------- 加花 ----------
+const fillBtn = $('fill');
+fillBtn.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (engine.requestFill()) fillBtn.setAttribute('aria-pressed', 'true');
+  else els.status.textContent = '先点一个和弦开始伴奏，再按加花';
+});
+segmented($('fill-every'), [[0, '关'], [4, '每 4 小节'], [8, '每 8 小节']],
+  () => state.fillEvery, (n) => { state.fillEvery = n; engine.setFillEvery(n); });
+
+// ---------- 音色来源（CC BY 要求署名） ----------
+$('credits').innerHTML = [...new Set(Object.values(ENSEMBLES).flatMap((e) => e.credits))]
+  .map((c) => `<li>${c}</li>`).join('');
+
+switchEnsemble(state.ensemble);

@@ -51,6 +51,7 @@
 
     <footer class="footer">
       <p class="status" id="status">正在加载钢琴音色…</p>
+      <button class="fillbtn" id="fill" type="button" aria-pressed="false">✨ 加花</button>
       <button class="rec" id="record" type="button" aria-pressed="false">● 录音</button>
       <button class="stop" id="stop" type="button">停止</button>
     </footer>
@@ -77,9 +78,19 @@
 
   <dialog class="sheet" id="settings-dialog">
     <h2>设置</h2>
+    <h3>乐队</h3>
+    <div class="seg" id="ensemble" role="group" aria-label="乐队"></div>
+    <p class="hint" id="ensemble-status"></p>
     <h3>伴奏织体</h3>
     <p class="hint" id="pattern-hint">点名字试听（伴奏中会立刻切换）。点 ★ 选为常用，最多 3 个，显示在主界面底部。</p>
     <div class="plist" id="pattern-list"></div>
+    <h3>自动加花</h3>
+    <div class="seg small" id="fill-every" role="group" aria-label="自动加花"></div>
+    <p class="hint">在小节最后一两拍，每件乐器都来一段过门，下一小节鼓再敲一下镲。也可以随时按主界面的"✨ 加花"。</p>
+    <h3>音量</h3>
+    <div class="volumes" id="volumes"></div>
+    <h3>音色来源</h3>
+    <ul class="credits" id="credits"></ul>
     <div class="actions">
       <button type="button" id="settings-close" class="primary">完成</button>
     </div>

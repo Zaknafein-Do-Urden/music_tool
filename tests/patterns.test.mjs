@@ -1,51 +1,90 @@
 import assert from 'node:assert/strict';
-import { METERS, PATTERNS, DEFAULT_FAVORITES, compilePattern } from '../js/patterns.js';
-
-assert.ok(Object.keys(PATTERNS).length >= 10, '织体要够多');
-assert.equal(DEFAULT_FAVORITES.length, 3);
-DEFAULT_FAVORITES.forEach((id) => assert.ok(PATTERNS[id]));
+import { METERS, compileTexture, compileFill, parseToken, textureVoices } from '../js/patterns.js';
+import { ENSEMBLES } from '../js/ensembles.js';
+import { makeKey, pentaLadder, powerChord } from '../js/theory.js';
 
 for (const [mid, meter] of Object.entries(METERS)) {
   assert.equal(meter.name, mid);
   assert.equal(meter.beats[0], 0, `${mid} 第一拍必须从第 0 步开始`);
   assert.ok(meter.beats.every((b) => b < meter.steps));
+}
 
-  for (const [pid, pattern] of Object.entries(PATTERNS)) {
-    assert.ok(pattern.name && pattern.desc, `${pid} 要有名字和说明`);
-    const events = compilePattern(pid, mid);
-    const steps = Object.keys(events).map(Number);
-    assert.ok(events[0]?.bass.length, `${pid} ${mid} 第一步应弹低音`);
-    for (const s of steps) {
-      const ev = events[s];
-      assert.ok(s >= 0 && s < meter.steps, `${pid} ${mid} 第 ${s} 步超出小节`);
-      assert.ok(ev.notes === 'all' || ev.notes.every((i) => i >= 0 && i <= 3));
-      assert.ok(ev.vel > 0 && ev.vel <= 1);
-      assert.ok(ev.dur >= 1 && s + ev.dur <= meter.steps, `${pid} ${mid} 第 ${s} 步时长 ${ev.dur}`);
-      assert.ok(ev.bassDur >= 1 && s + ev.bassDur <= meter.steps);
+// 每个乐队 × 每个织体 × 每个拍号都能编译，时长不出小节；加花也能编译
+for (const [eid, ens] of Object.entries(ENSEMBLES)) {
+  const texIds = Object.keys(ens.textures);
+  assert.ok(texIds.length >= 6, `${ens.name} 织体要够多`);
+  assert.equal(ens.defaultFavorites.length, 3);
+  ens.defaultFavorites.forEach((id) => assert.ok(ens.textures[id], `${ens.name} 默认常用 ${id} 不存在`));
+  assert.ok(ens.credits?.length, `${ens.name} 要写音色来源`);
+  for (const v of Object.values(ens.voices)) {
+    if (v.onChange) parseToken(v.onChange, v);
+  }
+
+  for (const tid of texIds) {
+    const tex = ens.textures[tid];
+    assert.ok(tex.name && tex.desc, `${eid}/${tid} 要有名字和说明`);
+    for (const [mid, meter] of Object.entries(METERS)) {
+      const { voices } = compileTexture(eid, tid, mid);
+      const first = Object.values(voices).some((evs) => evs[0]);
+      assert.ok(first, `${ens.name}/${tex.name} ${mid} 第一步应该有声音`);
+      for (const [vid, evs] of Object.entries(voices)) {
+        for (const [s, ev] of Object.entries(evs)) {
+          const step = +s;
+          assert.ok(step >= 0 && step < meter.steps);
+          assert.ok(ev.vel > 0 && ev.vel <= 1);
+          assert.ok(ev.dur >= 1 && step + ev.dur <= meter.steps, `${tex.name}/${vid} ${mid} 第 ${s} 步时长`);
+        }
+      }
+      const fill = compileFill(eid, tid, mid);
+      assert.ok(fill.start >= 0 && fill.start < meter.steps, `${tex.name} ${mid} 加花起点 ${fill.start}`);
+      for (const vid of Object.keys(fill.voices)) assert.ok(textureVoices(eid, tid).includes(vid), '只给在弹的乐器加花');
+      for (const evs of Object.values(fill.voices)) {
+        for (const s of Object.keys(evs)) assert.ok(+s >= fill.start && +s < meter.steps);
+      }
     }
   }
 }
 
-// 八分音符写法展开成十六分步：柱式 4/4 在 0 4 8 12 步
-assert.deepEqual(Object.keys(compilePattern('block', '4/4')).map(Number), [0, 4, 8, 12]);
-// 十六分写法逐步对应
-assert.equal(Object.keys(compilePattern('flow16', '4/4')).length, 16);
-// 2/4 取 4/4 前半小节
-assert.deepEqual(Object.keys(compilePattern('block', '2/4')).map(Number), [0, 4]);
-// 力度：小节第一拍 > 其他拍 > 反拍；重音、轻弹记号生效
-const rock = compilePattern('rock', '4/4');
+// 八分音符写法展开成十六分步
+assert.deepEqual(Object.keys(compileTexture('piano', 'block', '4/4').voices.piano).map(Number), [0, 4, 8, 12]);
+assert.equal(Object.keys(compileTexture('piano', 'flow16', '4/4').voices.piano).length, 16);
+assert.deepEqual(Object.keys(compileTexture('piano', 'block', '2/4').voices.piano).map(Number), [0, 4]);
+// 力度：第一拍 > 其他拍 > 反拍
+const rock = compileTexture('piano', 'rock', '4/4').voices.piano;
 assert.ok(rock[0].vel > rock[4].vel && rock[4].vel > rock[2].vel);
-const block = compilePattern('block', '4/4');
-assert.ok(block[4].vel < compilePattern('block', '4/4')[8].vel, '-A 应比同位置更轻');
-// 低音种类与时长：跨步 B . A . F . A . → 低音根音响到五度那一步
-const stride = compilePattern('stride', '4/4');
+// 跨步：根音响到五度那一步
+const stride = compileTexture('piano', 'stride', '4/4').voices.piano;
 assert.deepEqual(stride[0].bass, ['root']);
 assert.deepEqual(stride[8].bass, ['fifth']);
 assert.equal(stride[0].bassDur, 8);
-assert.deepEqual(compilePattern('heavy', '4/4')[0].bass, ['root', 'octave']);
-// 长音：整小节
-assert.equal(compilePattern('pad', '3/4')[0].dur, 12);
 
-assert.throws(() => compilePattern('block', '5/4'));
+// 鼓、贝斯、修饰符
+const band = compileTexture('band', 'rock8', '4/4').voices;
+assert.deepEqual(band.drums[0].drums, ['kick', 'hat']);
+assert.deepEqual(band.drums[4].drums, ['snare', 'hat']);
+assert.ok(band.guitar[2].staccato && band.guitar[2].power);
+assert.deepEqual(compileTexture('band', 'shuffle', '4/4').voices.bass[8].bass, ['sixth']);
+assert.equal(compileTexture('band', 'shuffle', '4/4').swing, 1);
+assert.equal(compileTexture('band', 'shuffle', '6/8').swing, 0, '6/8 不加摇摆');
+assert.ok(compileTexture('chinese', 'tremolo', '4/4').voices.pipa[0].tremolo);
+assert.ok(compileTexture('chinese', 'gliss', '4/4').voices.guzheng[0].gliss);
+assert.throws(() => parseToken('K', ENSEMBLES.piano.voices.piano), '钢琴不认鼓记号');
+assert.throws(() => parseToken('5', ENSEMBLES.piano.voices.piano), '和弦音数字最多到 3');
+assert.doesNotThrow(() => parseToken('9', ENSEMBLES.chinese.voices.guzheng), '五声梯子可以到 9');
+
+// 加花：靠右对齐；钢琴 4/4 最后一拍（第 12 步起）；乐队 4/4 最后两拍
+assert.equal(compileFill('piano', 'block', '4/4').start, 12);
+assert.equal(compileFill('band', 'rock8', '4/4').start, 8);
+assert.deepEqual(Object.keys(compileFill('band', 'rock8', '4/4').voices).sort(), ['bass', 'drums', 'guitar']);
+assert.deepEqual(Object.keys(compileFill('band', 'pop16', '4/4').voices).sort(), ['bass', 'clean', 'drums']);
+assert.equal(compileFill('band', 'rock8', '2/4').start, 0, '2/4 放得下就整小节加花');
+assert.equal(compileFill('chinese', 'flow', '6/8').start, 6);
+
+// 五声梯子、强力和弦
+const C = makeKey(0, 'major');
+assert.deepEqual(pentaLadder(C, 0, 55, 6), [60, 62, 64, 67, 69, 72]);
+assert.deepEqual(pentaLadder(C, 5, 55, 4), [65, 67, 69, 72], '4 级根音不在五声里，从它开始再走五声');
+assert.deepEqual(pentaLadder(makeKey(9, 'minor'), 9, 55, 5), [57, 60, 62, 64, 67]);
+assert.deepEqual(powerChord(7, 40), [43, 50, 55]);
 
 console.log('pattern tests passed');
