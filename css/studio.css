@@ -1,0 +1,62 @@
+/* 录音室页面（record.html），在 style.css 基础上 */
+html, body { height: auto; min-height: 100%; }
+.studio { height: auto; min-height: 100%; }
+
+.studio-top { display: flex; align-items: center; gap: 8px; }
+.studio-top h1 { flex: 1; margin: 0; font-size: 20px; text-align: center; }
+.studio-top .chip { flex: none; padding: 6px 10px; text-decoration: none; text-align: center; }
+
+.backing { display: flex; gap: 6px; }
+.backing .chip { overflow: hidden; text-overflow: ellipsis; padding: 8px 10px; font-size: 14px; }
+.backing .chip.has { color: var(--text); border-color: #4a5068; }
+.backing .clear { flex: none; width: 44px; }
+
+.livebox { position: relative; background: var(--panel); border: 1px solid #333849; border-radius: 14px; overflow: hidden; }
+#live-curve { display: block; width: 100%; height: 150px; }
+.live-info { position: absolute; top: 8px; right: 10px; display: flex; gap: 12px; align-items: baseline; font-variant-numeric: tabular-nums; }
+#live-note { font-size: 22px; font-weight: 700; }
+#live-time { font-size: 14px; color: var(--muted); }
+
+/* 大录音按钮：圆形红点，录音中变成方块 */
+.bigrec {
+  align-self: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 4px solid #e9ebf0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  touch-action: manipulation;
+}
+.bigrec i { width: 60px; height: 60px; border-radius: 50%; background: #e04848; transition: all 0.15s; }
+.bigrec[aria-pressed="true"] i { width: 32px; height: 32px; border-radius: 6px; }
+.bigrec:disabled { opacity: 0.5; }
+.studio .status { text-align: center; margin: 0; min-height: 1.4em; font-size: 14px; color: var(--muted); }
+
+.list-title { margin: 8px 0 0; font-size: 16px; }
+.list-title span { color: var(--muted); font-weight: 400; }
+.studio > .hint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.take .title .name {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+}
+.take .info { line-height: 1.5; }
+.take .row .primary { background: #2f5d45; border-color: #4f9c6e; }
+.empty { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0; }
+
+.detail { width: min(720px, calc(100% - 16px)); }
+#d-curve { display: block; width: 100%; height: 260px; background: var(--bg); border-radius: 12px; touch-action: none; }
+.detail audio { width: 100%; margin-top: 8px; }
+.legend { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; vertical-align: middle; margin: 0 3px 0 6px; }
+.legend i:first-child { margin-left: 0; }
+.legend .good { background: #6edca0; }
+.legend .near { background: #f0c75a; }
+.legend .off { background: #ff7b7b; }

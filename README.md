@@ -25,6 +25,13 @@
 - **🎧 耳机**：戴耳机时打开，音质更好；不戴耳机时关着，app 会尽量滤掉外放的伴奏。
 - **● 录音**：人声和伴奏分开录，录完可以分别调音量、对齐，再保存或分享成 WAV。录音刷新页面就没了，记得保存。
 
+## 录音室
+
+另一个页面 `record.html`（伴奏页的设置里有入口），专门录自己唱歌：
+- 戴上耳机，点红色按钮开始，再点停止。可以先"🎵 选伴奏"选一个音频文件，录音时从耳机里放。
+- 录音存在手机浏览器里，刷新不会丢；点"保存/分享"可以存到"文件"或发给别人。
+- 录完会自动分析：判断你唱的是什么调、音域多宽。点"听·看曲线"边听边看音高曲线：绿色是准的，黄色有点偏，红色偏得多，左右拖动曲线可以前后跳。
+
 iPhone 上建议在 Safari 里"分享 → 添加到主屏幕"，用起来像 app。如果没声音，检查音量和静音键。
 
 ## 本地运行
@@ -39,6 +46,6 @@ python -m http.server 8000
 
 1. 推送到 GitHub：`git push -u origin main`
 2. 仓库 Settings → Pages → Source 选 "Deploy from a branch"，Branch 选 `main`、目录 `/ (root)`，保存。
-3. 一两分钟后访问 `https://<用户名>.github.io/music_tool/`。之后每次推送到 main 都会自动更新。
+3. 一两分钟后访问 `https://<用户名>.github.io/music_tool/`（录音室是 `https://<用户名>.github.io/music_tool/record.html`）。之后每次推送到 main 都会自动更新，新页面不需要额外设置。
 
 后续路线见 [docs/ROADMAP.md](docs/ROADMAP.md)。

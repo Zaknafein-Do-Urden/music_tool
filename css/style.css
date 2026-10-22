@@ -213,6 +213,7 @@ html, body {
   white-space: nowrap;
   touch-action: manipulation;
 }
+.studio-link { display: block; margin: 0 0 12px; padding: 10px 12px; border: 1px solid #4a5068; border-radius: 12px; color: var(--text); font-size: 14px; text-decoration: none; background: var(--bg); }
 .chip[aria-pressed="true"] { background: #23382c; border-color: #4f9c6e; color: #bff0d2; }
 .chip span { color: var(--text); font-weight: 600; }
 

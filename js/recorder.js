@@ -4,12 +4,12 @@ import { encodeWav } from './wav.js';
 
 const Tone = window.Tone;
 
-function pickMime() {
+export function pickMime() {
   const types = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
   return types.find((t) => window.MediaRecorder?.isTypeSupported?.(t)) ?? '';
 }
 
-function recordStream(stream, mimeType) {
+export function recordStream(stream, mimeType) {
   const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };

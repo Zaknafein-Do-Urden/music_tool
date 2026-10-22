@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="录音室">
+  <meta name="theme-color" content="#14161c">
+  <title>录音室</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/studio.css">
+  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+</head>
+<body>
+  <main class="app studio">
+    <header class="studio-top">
+      <a class="chip" href="./">← 伴奏</a>
+      <h1>录音室</h1>
+      <button class="chip" id="headphones" type="button" aria-pressed="true">🎧 耳机</button>
+    </header>
+
+    <div class="backing">
+      <button class="chip" id="backing-pick" type="button">🎵 选伴奏</button>
+      <button class="chip clear" id="backing-clear" type="button" aria-label="不用伴奏" hidden>✕</button>
+      <input type="file" id="backing-file" accept="audio/*" hidden>
+    </div>
+
+    <section class="livebox">
+      <canvas id="live-curve"></canvas>
+      <div class="live-info"><span id="live-note">—</span><span id="live-time">0:00</span></div>
+    </section>
+
+    <button class="bigrec" id="record" type="button" aria-pressed="false" aria-label="开始录音"><i></i></button>
+    <p class="status" id="status">戴上耳机，点红色按钮开始录音</p>
+
+    <h2 class="list-title">我的录音 <span id="count"></span></h2>
+    <p class="hint">录音存在这台手机的浏览器里，刷新也不会丢。iPhone 上建议"添加到主屏幕"再用；重要的录音记得"保存/分享"到"文件"。</p>
+    <div id="takes"></div>
+  </main>
+
+  <dialog class="sheet detail" id="detail">
+    <h2 id="d-name"></h2>
+    <p class="hint" id="d-info"></p>
+    <canvas id="d-curve"></canvas>
+    <p class="legend"><i class="good"></i>准 <i class="near"></i>有点偏 <i class="off"></i>偏得多 · 左右拖动曲线可以前后移动</p>
+    <audio id="d-audio" controls preload="auto"></audio>
+    <div class="actions">
+      <button type="button" id="d-close" class="primary">关闭</button>
+    </div>
+  </dialog>
+  <script type="module" src="js/studio.js"></script>
+</body>
+</html>
