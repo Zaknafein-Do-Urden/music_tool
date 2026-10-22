@@ -2,7 +2,8 @@
 // 推荐本质是预测：和弦要在唱下一句之前按，所以只能用已经唱过的部分。
 import { MODES, chordFor } from './theory.js';
 
-// 和弦转移概率（流行歌经验值）：TRANSITIONS[mode][从][到]，按 MODES 里按钮顺序
+// 和弦转移概率（流行歌经验值）：TRANSITIONS[mode][从][到]，按 MODES 里按钮顺序。
+// 中国风（五声化）用 PENTA_TRANSITIONS：少用 5→1 的强解决，多停在 1、6m，4 和 6m 分量更重
 export const TRANSITIONS = {
   // 1 2m 3m 4 5 6m
   major: [
@@ -27,11 +28,33 @@ export const TRANSITIONS = {
 const sum = (a) => a.reduce((s, x) => s + x, 0);
 const normalize = (a) => { const s = sum(a); return s > 0 ? a.map((x) => x / s) : a.map(() => 1 / a.length); };
 
-// 旋律与每个和弦的契合度：唱的音落在和弦音上的比例，根音略加分
-export function chordFit(key, hist) {
+export const PENTA_TRANSITIONS = {
+  // 1 2sus 3m7 4 5sus 6m
+  major: [
+    [0.05, 0.08, 0.07, 0.30, 0.20, 0.30],
+    [0.15, 0.05, 0.15, 0.20, 0.30, 0.15],
+    [0.10, 0.10, 0.05, 0.30, 0.10, 0.35],
+    [0.25, 0.10, 0.10, 0.05, 0.35, 0.15],
+    [0.35, 0.05, 0.15, 0.10, 0.05, 0.30],
+    [0.15, 0.10, 0.15, 0.35, 0.20, 0.05],
+  ],
+  // 1m 3 4sus 5m7 6 7sus
+  minor: [
+    [0.05, 0.15, 0.20, 0.15, 0.25, 0.20],
+    [0.20, 0.05, 0.15, 0.10, 0.20, 0.30],
+    [0.25, 0.10, 0.05, 0.30, 0.15, 0.15],
+    [0.40, 0.10, 0.10, 0.05, 0.25, 0.10],
+    [0.15, 0.15, 0.15, 0.15, 0.05, 0.35],
+    [0.35, 0.30, 0.05, 0.10, 0.15, 0.05],
+  ],
+};
+
+// 旋律与每个和弦的契合度：唱的音落在和弦音（含低音根音）上的比例，根音略加分
+export function chordFit(key, hist, harmony = 'triad') {
   return MODES[key.mode].degrees.map((_, i) => {
-    const { root, pcs } = chordFor(key, i);
-    return pcs.reduce((s, p) => s + hist[p], 0) + 0.2 * hist[root];
+    const { root, pcs } = chordFor(key, i, harmony);
+    const tones = pcs.includes(root) ? pcs : [root, ...pcs];
+    return tones.reduce((s, p) => s + hist[p], 0) + 0.2 * hist[root];
   });
 }
 
@@ -73,10 +96,11 @@ export class ChordMemory {
 }
 
 // 综合打分，返回按分数从高到低的 [{ degree, score }]；唱得太少（hist 总量 < minWeight 秒）返回 []
-export function suggestChords({ key, hist, current = null, memory = null, minWeight = 0.25 }) {
+export function suggestChords({ key, hist, current = null, memory = null, harmony = 'triad', minWeight = 0.25 }) {
   if (sum(hist) < minWeight) return [];
-  const fit = normalize(chordFit(key, hist));
-  const trans = current === null ? null : normalize(TRANSITIONS[key.mode][current]);
+  const fit = normalize(chordFit(key, hist, harmony));
+  const table = harmony === 'penta' ? PENTA_TRANSITIONS : TRANSITIONS;
+  const trans = current === null ? null : normalize(table[key.mode][current]);
   const mem = memory?.recall(key, hist) ?? null;
 
   const parts = [[fit, 0.5], [trans, 0.25], [mem, 0.25]].filter(([v]) => v);

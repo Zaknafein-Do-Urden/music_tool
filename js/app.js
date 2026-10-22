@@ -1,4 +1,4 @@
-import { MODES, makeKey, chordFor } from './theory.js';
+import { MODES, makeKey, chordFor, degreesFor } from './theory.js';
 import { Engine, ENSEMBLES, METERS } from './engine.js';
 import { DEFAULT_ENSEMBLE } from './ensembles.js';
 import { Mic } from './mic.js';
@@ -102,8 +102,10 @@ function renderKey() {
   els.key.innerHTML = Array.from({ length: 12 }, (_, t) =>
     `<option value="${t}">${makeKey(t, state.mode).name.replace(/m$/, '')} ${modeName}</option>`).join('');
   els.key.value = String(state.key);
-  MODES[state.mode].degrees.forEach((d, i) => {
-    const name = chordFor(key, i).name;
+  // 中国风下按钮换成五声版和弦（如 Gsus2），级数和说明也跟着换
+  const harmony = ENSEMBLES[state.ensemble].harmony ?? 'triad';
+  degreesFor(state.mode, harmony).forEach((d, i) => {
+    const name = chordFor(key, i, harmony).name;
     const btn = pads[i];
     btn.querySelector('.degree').textContent = d.label;
     btn.querySelector('.name').textContent = name;
@@ -265,7 +267,9 @@ suggestBtn.addEventListener('click', async () => {
   }
   suggestBtn.setAttribute('aria-pressed', 'true');
   suggestTimer = setInterval(() => {
-    renderSuggest(suggestChords({ key: currentKey(), hist: recentHist(), current: engine.current, memory }));
+    renderSuggest(suggestChords({
+      key: currentKey(), hist: recentHist(), current: engine.current, memory, harmony: engine.harmony,
+    }));
   }, 150);
 });
 
@@ -530,6 +534,7 @@ async function switchEnsemble(id) {
   state.ensemble = id;
   saveSettings();
   renderEnsembleSeg();
+  renderKey();
   buildPatternBar();
   renderPatternList();
   renderVolumes();

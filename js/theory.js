@@ -36,6 +36,37 @@ export const MODES = {
   },
 };
 
+// 中国风"五声化"：每个按钮换成它的五声版和弦。低音仍弹和弦根音，上面的音只取五声音阶（去掉 4、7 两个音），
+// 听起来是开阔、不紧张的挂留和弦、加六和弦，也没有西洋小调那种导音。
+// up：根音之上的三个音（相对根音的半音数）。大调 4 级（小调 6 级）根音本身不在五声里，上面就不放根音，变成"6 和弦"
+export const PENTA_DEGREES = {
+  // C 调：C  Dsus2  Em7  F6  Gsus2  Am
+  major: [
+    { label: '1', up: [0, 4, 7], suffix: '', hint: '家·稳定' },
+    { label: '2sus', up: [0, 2, 7], suffix: 'sus2', hint: '开阔·悬着' },
+    { label: '3m7', up: [0, 3, 10], suffix: 'm7', hint: '柔和' },
+    { label: '4', up: [4, 7, 9], suffix: '6', hint: '温暖·展开' },
+    { label: '5sus', up: [0, 2, 7], suffix: 'sus2', hint: '留白·想回家' },
+    { label: '6m', up: [0, 3, 7], suffix: 'm', hint: '伤感' },
+  ],
+  // A 小调：Am  C  Dsus2  Em7  F6  Gsus2（5 级不用带导音的大三和弦，用 5m7，即羽调式的做法）
+  minor: [
+    { label: '1m', up: [0, 3, 7], suffix: 'm', hint: '家·忧郁' },
+    { label: '3', up: [0, 4, 7], suffix: '', hint: '明亮' },
+    { label: '4sus', up: [0, 2, 7], suffix: 'sus2', hint: '开阔' },
+    { label: '5m7', up: [0, 3, 10], suffix: 'm7', hint: '柔和·不急着回家' },
+    { label: '6', up: [4, 7, 9], suffix: '6', hint: '温暖·展开' },
+    { label: '7sus', up: [0, 2, 7], suffix: 'sus2', hint: '推进·悬着' },
+  ],
+};
+
+// 按钮上显示的级数和说明：harmony 为 'penta'（中国风）时用五声版
+export function degreesFor(mode, harmony = 'triad') {
+  const base = MODES[mode].degrees;
+  if (harmony !== 'penta') return base;
+  return base.map((d, i) => ({ ...d, label: PENTA_DEGREES[mode][i].label, hint: PENTA_DEGREES[mode][i].hint }));
+}
+
 export function makeKey(tonic, mode = 'major') {
   const t = ((tonic % 12) + 12) % 12;
   const flat = FLAT_TONICS[mode].includes(t);
@@ -46,10 +77,14 @@ export function pcName(pc, flat) {
   return (flat ? FLAT_NAMES : SHARP_NAMES)[((pc % 12) + 12) % 12];
 }
 
-// 某调某级的和弦：{ root 音级, pcs 三个音级, name 如 "Am" }
-export function chordFor(key, degreeIndex) {
+// 某调某级的和弦：{ root 低音音级, pcs 上方三个音级, name 如 "Am" }。harmony 'penta' 时取五声版
+export function chordFor(key, degreeIndex, harmony = 'triad') {
   const d = MODES[key.mode].degrees[degreeIndex];
   const root = (key.tonic + d.offset) % 12;
+  if (harmony === 'penta') {
+    const p = PENTA_DEGREES[key.mode][degreeIndex];
+    return { root, pcs: p.up.map((x) => (root + x) % 12), name: pcName(root, key.flat) + p.suffix };
+  }
   const third = (root + (d.minor ? 3 : 4)) % 12;
   const fifth = (root + 7) % 12;
   return { root, pcs: [root, third, fifth], name: pcName(root, key.flat) + (d.minor ? 'm' : '') };
@@ -94,13 +129,21 @@ export function powerChord(rootPc, lo = 40) {
   return [r, r + 7, r + 12];
 }
 
-// 五声音阶"梯子"：从不低于 from 的和弦根音开始往上，只走宫商角徵羽（大调 1 2 3 5 6；小调用同组音 1 b3 4 5 b7）。
+// 调的五声音阶音级（大调 1 2 3 5 6；小调用同组音 1 b3 4 5 b7）
+export function pentaPcs(key) {
+  const steps = key.mode === 'major' ? [0, 2, 4, 7, 9] : [0, 3, 5, 7, 10];
+  return steps.map((s) => (key.tonic + s) % 12);
+}
+
+// 五声音阶"梯子"：从不低于 from 的和弦根音开始往上，只走宫商角徵羽。
+// 根音本身不在五声里（大调 4 级）时从它上面最近的五声音开始，上方声部就不会出现 4、7。
 // 中式织体用它弹琶音、刮奏，即使和弦不变也有中国味
 export function pentaLadder(key, rootPc, from, count = 10) {
-  const steps = key.mode === 'major' ? [0, 2, 4, 7, 9] : [0, 3, 5, 7, 10];
-  const pcs = steps.map((s) => (key.tonic + s) % 12);
-  const ladder = [bassNote(rootPc, from)];
-  for (let m = ladder[0] + 1; ladder.length < count; m++) {
+  const pcs = pentaPcs(key);
+  let start = bassNote(rootPc, from);
+  while (!pcs.includes(start % 12)) start++;
+  const ladder = [start];
+  for (let m = start + 1; ladder.length < count; m++) {
     if (pcs.includes(m % 12)) ladder.push(m);
   }
   return ladder;

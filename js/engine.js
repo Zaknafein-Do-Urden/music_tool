@@ -129,6 +129,7 @@ export class Engine {
     if (this.loadingId !== id) return false;
     this.rig = rig;
     this.ensembleId = id;
+    this.harmony = ENSEMBLES[id].harmony ?? 'triad';
     this.textureId = textureId;
     this._compile();
     this._revoice();
@@ -227,7 +228,7 @@ export class Engine {
   // 换和弦/换调后，每件弹和弦的乐器各自选最顺的转位
   _revoice() {
     if (!this.rig || this.current === null || !this.key) return;
-    const { pcs } = chordFor(this.key, this.current);
+    const { pcs } = chordFor(this.key, this.current, this.harmony);
     for (const v of Object.values(this.rig.voices)) {
       if (v.cfg.chordRange) v.voicing = voiceChord(pcs, v.voicing, ...v.cfg.chordRange);
     }
@@ -257,7 +258,7 @@ export class Engine {
 
     const inFill = this.fillThisBar && step >= this.fill.start;
     if (this.current !== null && this.rig) {
-      const chord = chordFor(this.key, this.current);
+      const chord = chordFor(this.key, this.current, this.harmony);
       for (const vid of this.active) {
         const v = this.rig.voices[vid];
         const fillEvents = inFill && this.fill.voices[vid];

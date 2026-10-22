@@ -9,6 +9,7 @@
 //   penta 五声音阶梯子（0 = 和弦根音，往上 1 2 3… 只走宫商角徵羽，最多到 9）
 // 音区（MIDI 音高）：chordRange 和弦排列，bassRange 低音，powerFrom 强力和弦根音下限，ladderFrom 五声梯子起点
 // volume：默认音量（dB）。FluidR3 采样比钢琴、鼓采样小声很多，按实测峰值和钢琴拉平
+// 乐队 harmony：'penta' 时和弦按钮五声化（中国风），不写就是普通三和弦
 // onChange：换和弦那一刻如果这件乐器这一步没弹低音，补弹什么，让切换听得清楚
 
 const FLUID = (name, octaves) => ({ kind: 'fluid', name, octaves });
@@ -136,6 +137,8 @@ export const ENSEMBLES = {
 
   chinese: {
     name: '中国风',
+    // 和弦五声化：按钮换成五声版（见 theory.js PENTA_DEGREES），推荐用中国风的和弦走向习惯
+    harmony: 'penta',
     voices: {
       guzheng: {
         name: '古筝', type: 'keys', noteSet: 'penta', source: FLUID('koto', [2, 6]), volume: 13,

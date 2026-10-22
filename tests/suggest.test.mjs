@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { makeKey } from '../js/theory.js';
-import { suggestChords, chordFit, ChordMemory, TRANSITIONS } from '../js/suggest.js';
+import { suggestChords, chordFit, ChordMemory, TRANSITIONS, PENTA_TRANSITIONS } from '../js/suggest.js';
 
 const hist = (weights) => {
   const h = new Array(12).fill(0);
@@ -50,5 +50,13 @@ assert.ok(rank(suggestChords({ key: C, hist: eOnly, current: 0, memory: mem }), 
 const restored = new ChordMemory(JSON.parse(JSON.stringify(mem)));
 assert.equal(restored.entries.length, 3);
 assert.equal(chordFit(C, hist({})).every((x) => x === 0), true);
+
+// 中国风：转移表每行和为 1；唱 G A D → 推荐 5sus（Gsus2），普通模式下 A 不是 G 的和弦音
+for (const rows of Object.values(PENTA_TRANSITIONS)) rows.forEach((r) => assert.ok(Math.abs(r.reduce((s, x) => s + x, 0) - 1) < 1e-9));
+assert.equal(suggestChords({ key: C, hist: hist({ 7: 1, 9: 1, 2: 1 }), harmony: 'penta' })[0].degree, 4);
+// F6：唱 A C D（F 不唱）也该想到 4 级
+assert.equal(suggestChords({ key: C, hist: hist({ 9: 1, 0: 0.5, 2: 1 }), harmony: 'penta' })[0].degree, 3);
+// 中国风下 5 之后不那么急着回 1
+assert.ok(PENTA_TRANSITIONS.major[4][0] < TRANSITIONS.major[4][0]);
 
 console.log('suggest tests passed');

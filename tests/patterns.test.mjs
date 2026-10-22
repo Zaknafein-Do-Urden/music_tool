@@ -83,7 +83,7 @@ assert.equal(compileFill('chinese', 'flow', '6/8').start, 6);
 // 五声梯子、强力和弦
 const C = makeKey(0, 'major');
 assert.deepEqual(pentaLadder(C, 0, 55, 6), [60, 62, 64, 67, 69, 72]);
-assert.deepEqual(pentaLadder(C, 5, 55, 4), [65, 67, 69, 72], '4 级根音不在五声里，从它开始再走五声');
+assert.deepEqual(pentaLadder(C, 5, 55, 4), [67, 69, 72, 74], '4 级根音 F 不在五声里，从它上面最近的五声音开始');
 assert.deepEqual(pentaLadder(makeKey(9, 'minor'), 9, 55, 5), [57, 60, 62, 64, 67]);
 assert.deepEqual(powerChord(7, 40), [43, 50, 55]);
 
