@@ -114,12 +114,22 @@ function renderKey() {
   });
 }
 
+// 主界面下方的常用和弦走向：跟着乐队、大小调变，级数和按钮上的一致（中国风是五声版）
+function renderProgressions() {
+  const e = ENSEMBLES[state.ensemble];
+  const labels = degreesFor(state.mode, e.harmony ?? 'triad').map((d) => d.label);
+  const list = e.progressions?.[state.mode] ?? [];
+  $('progs').innerHTML = '<span class="lead">常用走向</span>' + list.map((p) =>
+    `<span class="prog">${p.name}<b>${p.steps.map((i) => labels[i]).join(' → ')}</b></span>`).join('');
+}
+
 function changeKey(tonic, mode = state.mode) {
   state.key = ((tonic % 12) + 12) % 12;
   state.mode = mode;
   engine.setKey(currentKey());
   renderKey();
   renderMode();
+  renderProgressions();
   saveSettings();
 }
 
@@ -535,6 +545,7 @@ async function switchEnsemble(id) {
   saveSettings();
   renderEnsembleSeg();
   renderKey();
+  renderProgressions();
   buildPatternBar();
   renderPatternList();
   renderVolumes();
@@ -598,3 +609,13 @@ $('credits').innerHTML = [...new Set(Object.values(ENSEMBLES).flatMap((e) => e.c
   .map((c) => `<li>${c}</li>`).join('');
 
 switchEnsemble(state.ensemble);
+
+// ---------- 弹窗：点窗口外面（背景）就关闭；设置改动是即时保存的，关掉即生效 ----------
+for (const dialog of document.querySelectorAll('dialog.sheet')) {
+  dialog.addEventListener('click', (e) => {
+    if (e.target !== dialog) return;
+    const r = dialog.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (!inside) dialog.close();
+  });
+}

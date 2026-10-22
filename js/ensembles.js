@@ -9,6 +9,7 @@
 //   penta 五声音阶梯子（0 = 和弦根音，往上 1 2 3… 只走宫商角徵羽，最多到 9）
 // 音区（MIDI 音高）：chordRange 和弦排列，bassRange 低音，powerFrom 强力和弦根音下限，ladderFrom 五声梯子起点
 // volume：默认音量（dB）。FluidR3 采样比钢琴、鼓采样小声很多，按实测峰值和钢琴拉平
+// 乐队 progressions：主界面下方列出的常用和弦走向，steps 是按钮序号（0 = 左上），显示时换成按钮上的级数
 // 乐队 harmony：'penta' 时和弦按钮五声化（中国风），不写就是普通三和弦
 // onChange：换和弦那一刻如果这件乐器这一步没弹低音，补弹什么，让切换听得清楚
 
@@ -24,6 +25,20 @@ export const ENSEMBLES = {
       },
     },
     defaultFavorites: ['block', 'arpeggio', 'ballad'],
+    progressions: {
+      major: [
+        { name: '万能', steps: [0, 4, 5, 3] },
+        { name: '校园', steps: [0, 5, 3, 4] },
+        { name: '抒情', steps: [3, 4, 2, 5, 1, 4, 0] },
+        { name: '流行', steps: [5, 3, 0, 4] },
+      ],
+      minor: [
+        { name: '忧伤', steps: [0, 4, 1, 5] },
+        { name: '经典', steps: [0, 2, 3, 0] },
+        { name: '下行', steps: [0, 5, 4, 3] },
+        { name: '上扬', steps: [4, 5, 0] },
+      ],
+    },
     textures: {
       block: { name: '柱式', desc: '每拍一个和弦，最稳最通用', parts: { piano: {
         '4/4': 'BA . -A . BA . -A .', '3/4': 'BA . -A . -A .', '6/8': 'BA . . A . .' } } },
@@ -73,6 +88,20 @@ export const ENSEMBLES = {
       },
     },
     defaultFavorites: ['rock8', 'pop16', 'halftime'],
+    progressions: {
+      major: [
+        { name: '万能', steps: [0, 4, 5, 3] },
+        { name: '摇滚', steps: [0, 3, 4, 3] },
+        { name: '流行', steps: [5, 3, 0, 4] },
+        { name: '老歌', steps: [0, 5, 3, 4] },
+      ],
+      minor: [
+        { name: '硬摇滚', steps: [0, 4, 5, 0] },
+        { name: '忧伤', steps: [0, 4, 1, 5] },
+        { name: '下行', steps: [0, 5, 4, 3] },
+        { name: '布鲁斯', steps: [0, 2, 0, 3] },
+      ],
+    },
     textures: {
       rock8: { name: '摇滚八分', desc: '失真吉他闷音八分，最典型的摇滚', parts: {
         drums: { '4/4': 'KH H SH H KH KH SH H', '3/4': 'KH H SH H SH H', '6/8': 'KH H H SH H H' },
@@ -155,6 +184,20 @@ export const ENSEMBLES = {
     },
     reverb: { decay: 3.5, wet: 0.35 },
     defaultFavorites: ['flow', 'gliss', 'tremolo'],
+    progressions: {
+      major: [
+        { name: '古风', steps: [0, 5, 3, 4] },
+        { name: '婉转', steps: [5, 3, 4, 0] },
+        { name: '抒情', steps: [3, 4, 2, 5] },
+        { name: '卡农', steps: [0, 4, 5, 2, 3, 0, 3, 4] },
+      ],
+      minor: [
+        { name: '古风', steps: [0, 4, 5, 0] },
+        { name: '沉吟', steps: [0, 2, 3, 0] },
+        { name: '回望', steps: [4, 5, 1, 0] },
+        { name: '叙事', steps: [0, 1, 4, 5] },
+      ],
+    },
     textures: {
       flow: { name: '流水', desc: '古筝五声音阶上下流动，长笛轻轻托着', parts: {
         guzheng: { '4/4': 'B0 1 2 3 4 3 2 1', '3/4': 'B0 1 2 3 2 1', '6/8': 'B0 1 2 3 2 1' },

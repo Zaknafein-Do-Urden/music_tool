@@ -16,6 +16,11 @@ for (const [eid, ens] of Object.entries(ENSEMBLES)) {
   assert.equal(ens.defaultFavorites.length, 3);
   ens.defaultFavorites.forEach((id) => assert.ok(ens.textures[id], `${ens.name} 默认常用 ${id} 不存在`));
   assert.ok(ens.credits?.length, `${ens.name} 要写音色来源`);
+  for (const mode of ['major', 'minor']) {
+    const progs = ens.progressions?.[mode] ?? [];
+    assert.ok(progs.length >= 3, `${ens.name} ${mode} 常用走向至少 3 个`);
+    for (const p of progs) assert.ok(p.name && p.steps.length >= 3 && p.steps.every((i) => Number.isInteger(i) && i >= 0 && i < 6));
+  }
   for (const v of Object.values(ens.voices)) {
     if (v.onChange) parseToken(v.onChange, v);
   }

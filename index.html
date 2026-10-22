@@ -36,13 +36,15 @@
         <button class="chip" id="suggest-toggle" type="button" aria-pressed="false">💡 推荐</button>
         <button class="chip" id="headphones" type="button" aria-pressed="false">🎧 耳机</button>
         <button class="chip" id="takes-open" type="button">录音 <span id="takes-count">0</span></button>
-        <button class="chip icon" id="settings-open" type="button" aria-label="设置">⚙</button>
+        <button class="chip settings" id="settings-open" type="button">⚙ 设置</button>
       </div>
     </header>
 
     <div class="beats" id="beats" aria-hidden="true"></div>
 
     <section class="pads" id="pads"></section>
+
+    <div class="progs" id="progs" aria-label="常用和弦走向"></div>
 
     <div class="toolbar">
       <div class="seg small" id="pattern" role="group" aria-label="伴奏"></div>
@@ -78,6 +80,7 @@
 
   <dialog class="sheet" id="settings-dialog">
     <h2>设置</h2>
+    <p class="hint">改动立即生效；点窗口外面就能关掉。</p>
     <h3>乐队</h3>
     <div class="seg" id="ensemble" role="group" aria-label="乐队"></div>
     <p class="hint" id="ensemble-status"></p>
